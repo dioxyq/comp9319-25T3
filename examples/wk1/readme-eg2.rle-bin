@@ -1,0 +1,4 @@
+eg2.rle-bin:
+2 bit for S, R or C
+6 bit for integer upto 63
+

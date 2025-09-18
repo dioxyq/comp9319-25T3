@@ -1,0 +1,4 @@
+eg1.rle-bin:
+1 bit for S or R
+7 bit for integer upto 127
+
