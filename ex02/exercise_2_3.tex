@@ -1,0 +1,121 @@
+\documentclass[12pt]{article}
+\usepackage{ava-task}
+
+\title{Exercises Week 2/3}
+\author{Ava Cameron z5488168}
+
+\begin{document}
+\maketitle
+
+
+\section*{Question 1}
+
+Given the text string below:
+
+\textbf{jejunojejunostomy}
+
+\begin{enumerate}
+  \item What is its entropy?
+
+    Shannon's formula: $ H = \sum_{i=1}^{n} -p(s_i) \log_{2} p(s_i) $
+
+    \begin{tabular}{ |c|c|c|c|c|c|c|c|c| }
+      \hline
+      j & o & e & u & n & s & t & m & y \\
+      \hline
+      4 & 3 & 2 & 2 & 2 & 1 & 1 & 1 & 1 \\
+      \hline
+    \end{tabular}
+
+    $ len(s) = 17 $ 
+
+    $ H = 2.984 $ (3 d.p.)
+
+  \newpage
+
+  \item Draw a Huffman tree based on the letters and their corresponding distributions for the above text string (Do not need to draw trees for the intermediate steps).
+
+    \begin{forest}
+      for tree = { draw, circle, minimum height=9mm,
+        if n=1{edge label={node [midway, left] {0} } }{edge label={node [midway, right] {1} } },
+        if n children=0{ draw=none, no edge, for parent={l sep=0mm}, edge label={} }{}
+      },
+      [17
+        [9
+          [4 [j]]
+          [5
+            [3 [o]]
+            [2 [e]]
+          ]
+        ]
+        [8
+          [4
+            [2 [u]]
+            [2 [n]]
+          ]
+          [4
+            [2
+              [1 [s]]
+              [1 [t]]
+            ]
+            [2 
+              [1 [m]]
+              [1 [y]]
+            ]
+          ]
+        ]
+      ]
+    \draw;
+    \end{forest}
+
+  \item Provide the resulting Huffman code for each letter.
+
+    \begin{tabular}{ |c|c|c|c|c|c|c|c|c| }
+      \hline
+      j & o & e & u & n & s & t & m & y \\
+      \hline
+      00 & 010 & 011 & 100 & 101 & 1100 & 1101 & 1110 & 1111 \\
+      \hline
+    \end{tabular}
+
+  \item What is the average number of bits needed for each letter, using your Huffman code? How does it compare to the entropy ? (i.e., equal/larger/small and why)
+
+    3. It is larger than the entropy because entropy is a lower bound
+    on compression (in terms of the average number of bits needed to
+    represent a character). It is however quite close, with a difference
+    of only $\sim 0.026$ bits, meaning this is a very good encoding.
+
+\end{enumerate}
+
+
+\section*{Question 2}
+
+\begin{enumerate}
+  \item The length of a given string is 8, containing letters a, f, i, r with their probability ranges as below:
+
+    a [0.0, 0.125), f [0.125, 0.625), i [0.625, 0.75), r [0.75, 1.0)
+
+    Decode the arithmetic code 0.91805 to its corresponding string.
+
+    ``riffraff''.
+
+  \item Given the string:
+
+    \textbf{jejunojeju}
+
+    Derive an arithmetic code. (Your answer should be in decimal number with minimum precision).
+\end{enumerate}
+
+\newpage
+
+
+\section*{Question 3}
+
+Consider the dictionary-based LZW compression algorithm. Suppose the alphabet is the set of ASCII characters, and the first 256 (i.e., <0> to <255>) table entries are initialized to these characters.
+
+Show the dictionary (symbol sets plus associated codes) and output for LZW compression of the input string:
+
+\textbf{jejunojejuno}
+
+
+\end{document}

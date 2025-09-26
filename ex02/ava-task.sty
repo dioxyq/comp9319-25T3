@@ -1,0 +1,202 @@
+% This is a configuration file that provides many packages, settings and custom environments used throughout the task resources.
+% Ordinarily, it must be located in the same directory as the .tex file which includes it, or on your PATH.
+% However, Overleaf will also find it if it is in the top level of the project, which we find to be the most convenient approach.
+
+\ProvidesPackage{algos-tasks}
+
+%%% diagrams %%%
+\usepackage{tikz}
+\usepackage[left = 1.7cm, right = 1.7cm, top = 3cm, bottom = 3cm]{geometry}
+\usepackage{forest}
+\usetikzlibrary{automata, arrows.meta, positioning, arrows, graphs.standard, matrix, 3d, shapes, calc}
+\newcommand{\TikZ}{Ti\textit{k}Z} % the name of the package
+
+%%% custom colours %%%
+\definecolor{orangee}{RGB}{252,186,3}
+
+%%% lists %%%
+\usepackage{enumitem}
+\setlist[enumerate,1]{label=(\alph*)} % changes default numbering of top level from 1. 2. 3. to (a) (b) (c)
+\setlist[enumerate,2]{label=(\roman*)} % changes default numbering of second level from (a) (b) (c) to (i) (ii) (iii)
+
+%%% maths %%%
+\usepackage{amsmath, amsthm, amssymb, mathtools}
+\DeclareMathOperator{\opt}{opt}
+\DeclareMathOperator{\num}{num}
+\DeclareMathOperator{\md}{ mod }
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+
+%%% pseudocode %%%
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+%%% code listings %%%
+\usepackage{listings}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    language=[LaTeX]{TeX},
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    % numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    % numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle} % sets the above as the default style for all code listings
+
+%%% symbols %%%
+\usepackage{bbding, twemojis}
+
+%%% misc %%%
+\usepackage{parskip}
+\usepackage{xcolor}
+\usepackage{tabularx}
+% \usepackage{subfig}
+\usepackage{multicol}
+\usepackage{import}
+\usepackage{comment} % Provides \excludecomment{...} to exclude a type of environment
+
+% custom header
+% title
+% is LaTeX task
+% is checkpoint task
+\usepackage{keyval}
+\define@key{task}{regular}[]{This is a \textbf{regular task}. You must submit a PDF, which can be produced using the \LaTeX\ template on Moodle, exported from a word processor, hand-written or any other method.\par}
+\define@key{task}{latex}[]{This is a \textbf{\LaTeX\ task}. You must submit both your \texttt{.tex} source file and a compiled \texttt{.pdf} file. Your response will be assessed on both content and presentation.\par}
+\define@key{task}{checkpoint}[]{This is a \textbf{checkpoint task}. Instructors will set the task status to `Discuss' if they are satisfied with your work. The task will only be upgraded to `Complete' once you have discussed at least one of the checkpoint tasks of this module at this grade level with an instructor \emph{in person.}\par}
+\define@key{task}{veryhard}[]{This task is \textbf{very hard}. It is intended to challenge top students, and should be among your \emph{last} priorities.\par}
+\define@key{task}{extension}[]{This task introduces \textbf{new material}. It is intended to extend top students, and should be among your \emph{last} priorities.\par}
+\define@key{task}{written}[]{This is a \textbf{writing focus task}. This task will not have a discussion take place in person for marking purposes. Instead, this will only be marked online, but particular emphasis will be placed on how your solution is written in addition to the correctness of the solution.}
+\newcommand{\task}[2][]{\section*{#2}\setkeys{task}{#1}\vspace{1em}}
+
+% new question style.
+\usepackage[framemethod=tikz]{mdframed}
+\mdfdefinestyle{question}{
+	innertopmargin=0.8\baselineskip,
+        innerbottommargin=0.8\baselineskip,
+	roundcorner=5pt
+}
+
+\newenvironment{question}[1][\unskip]{
+	\begin{mdframed}[style=question]
+}{
+	\end{mdframed}
+	\medskip
+}
+
+% new rubric environment
+\newenvironment{rubric}[1][\unskip]{
+	\begin{mdframed}[style=rubric, linecolor = red!60!black, fontcolor = red!60!black]
+        {\bfseries Rubric.}
+}{
+	\end{mdframed}
+	\medskip
+}
+
+\mdfdefinestyle{rubric}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = red!10
+}
+
+% new solution environment
+\mdfdefinestyle{solution}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = green!10
+}
+
+\newenvironment{solution}[1][\unskip]{
+	\begin{mdframed}[style=solution]
+        {\bfseries Solution.}
+}{
+	\end{mdframed}
+	\medskip
+}
+
+% new sample answer environment
+\mdfdefinestyle{samplesoln}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = violet!10
+}
+
+\newenvironment{samplesoln}[1][\unskip]{
+	\begin{mdframed}[style=samplesoln]
+        {\bfseries Sample Solution.}
+}{
+	\end{mdframed}
+	\medskip
+}
+
+% new sample answer environment
+\mdfdefinestyle{staffnotes}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = orange!10
+}
+
+\newenvironment{staffnotes}[1][\unskip]{
+	\begin{mdframed}[style=staffnotes]
+        {\bfseries Notes.}
+}{
+	\end{mdframed}
+	\medskip
+}
+
+% new attribution environment
+\mdfdefinestyle{attribution}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = cyan!10
+}
+
+\newenvironment{attribution}[1][\unskip]{
+	\begin{mdframed}[style=attribution]
+        {\bfseries Attribution.}
+}{
+	\end{mdframed}
+	\medskip
+}
+
+% boxed environment
+\mdfdefinestyle{bluebox}{
+	innertopmargin=0.8\baselineskip,
+	innerbottommargin=0.8\baselineskip,
+        backgroundcolor = blue!5
+}
+
+\newenvironment{bluebox}[1][\unskip]{
+	\begin{mdframed}[style=bluebox]
+}{
+	\end{mdframed}
+	\medskip
+}
+
+%%% links %%%
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,      
+  urlcolor=cyan
+}
