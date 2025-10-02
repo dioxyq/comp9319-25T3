@@ -47,7 +47,7 @@ auto lzw(std::ifstream &input_file, std::ofstream &output_file,
 
     p.push_back(c); // p becomes pc
 
-    if (dict.contains(p)) {
+    if (dict.find(p) != dict.end()) {
       continue;
     }
 
