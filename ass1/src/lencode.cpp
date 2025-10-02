@@ -3,6 +3,10 @@
 #include <iostream>
 #include <map>
 
+inline auto out_code_debug(uint32_t code, std::ofstream &output_file) {
+  output_file << '<' << code << '>';
+}
+
 inline auto out_code(uint32_t code, std::ofstream &output_file) {
   auto small = static_cast<char>(0xFFU & code);
   auto mid = static_cast<char>(((0xFFU << 8) & code) >> 8);
@@ -25,15 +29,20 @@ auto lzw(std::ifstream &input_file, std::ofstream &output_file,
   std::string p;
   char c;
   uint32_t index = 256;
-  uint32_t reset_index = 0;
+  uint32_t reset_index = 1;
   std::map<std::string, uint32_t> dict;
 
   input_file.get(c); // skip first symbol
   p = c;
 
   while (input_file.get(c)) {
-    if (++reset_index >= reset_frequency) {
+    if (reset_index++ == reset_frequency) {
+      reset_index = 0;
+      index = 256;
       dict.clear();
+      output_file << p;
+      p = c;
+      continue;
     }
 
     p.push_back(c); // p becomes pc
