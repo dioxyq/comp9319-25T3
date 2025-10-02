@@ -17,6 +17,11 @@ inline auto out_code(uint32_t code, std::ofstream &output_file) {
 
 auto lzw(std::ifstream &input_file, std::ofstream &output_file,
          const uint32_t reset_frequency) {
+  output_file << static_cast<char>((reset_frequency >> 24) & 0xFFU)
+              << static_cast<char>((reset_frequency >> 16) & 0xFFU)
+              << static_cast<char>((reset_frequency >> 8) & 0xFFU)
+              << static_cast<char>(reset_frequency & 0xFFU);
+
   std::string p;
   char c;
   uint32_t index = 256;
