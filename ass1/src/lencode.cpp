@@ -65,6 +65,8 @@ auto lzw(std::ifstream &input_file, std::ofstream &output_file,
 
     p = c;
   }
+
+  output_file << p;
 }
 
 auto main(int argc, char *argv[]) -> int {
