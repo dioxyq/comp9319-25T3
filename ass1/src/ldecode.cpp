@@ -13,11 +13,49 @@ inline auto swap_endian(uint32_t x) -> uint32_t {
 
 auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
                 const uint32_t reset_frequency) {
-  (void)input_file;
-  (void)output_file;
-  (void)reset_frequency;
+  std::string p;
+  char c;
+  uint32_t index = 256;
+  uint32_t reset_index = 1;
+  std::map<uint32_t, std::string> dict;
 
-  std::cout << reset_frequency;
+  (void)reset_frequency;
+  (void)reset_index;
+
+  input_file.get(c); // skip first symbol
+  output_file << c;
+  p = c;
+
+  while (input_file.get(c)) {
+    unsigned char uc = static_cast<unsigned char>(c);
+    std::string out;
+
+    if (uc < 0x80) { // regular char
+      out.push_back(c);
+    } else { // 2-byte code
+      uint32_t code = uc;
+      input_file.get(c);
+      reset_index++;
+      code <<= 8;
+      code |= static_cast<unsigned char>(c);
+
+      if (uc > 0xC0) { // 3-byte code
+        input_file.get(c);
+        reset_index++;
+        code <<= 8;
+        code |= static_cast<unsigned char>(c);
+      }
+
+      // lookup code, handle edge case
+      out.append(code > index ? p + p[0] : dict[code]);
+    }
+
+    output_file << out;
+    dict.emplace(index++, p + out[0]);
+    p = out;
+  }
+
+  output_file << p; // output remaining tokens (invariant: p is never in dict)
 }
 
 auto main(int argc, char *argv[]) -> int {
