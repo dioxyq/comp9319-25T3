@@ -31,7 +31,6 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
   while (input_file.get(c)) {
     // handle dictionary reset
     if (reset_index >= reset_frequency) {
-      std::cout << reset_index << ':' << c << ' ';
       reset_index = 1;
       index = 256;
       dict.clear();
@@ -58,14 +57,13 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
       }
 
       // lookup code, handle edge case
-      out.append(code > index ? p + p[0] : dict[code]);
+      out.append(code >= index ? p + p[0] : dict[code]);
     }
 
     output_file << out;
     reset_index += static_cast<uint32_t>(out.length());
     if (index < 1U << 22) {
       dict.emplace(index++, p + out[0]);
-      // std::cout << index << ": " << p + out[0] << '\n';
     }
     p = out;
   }
