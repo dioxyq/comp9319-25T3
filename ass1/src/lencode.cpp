@@ -11,10 +11,6 @@ inline auto swap_endian(uint32_t x) -> uint32_t {
   return r;
 }
 
-inline auto out_code_debug(uint32_t code, std::ofstream &output_file) {
-  output_file << '<' << code << '>';
-}
-
 inline auto out_code(uint32_t code, std::ofstream &output_file) {
   const auto num_bytes = 1 + (code >= 1U << 8) + (code >= 1U << 14);
   if (num_bytes == 2) {
@@ -27,6 +23,15 @@ inline auto out_code(uint32_t code, std::ofstream &output_file) {
       sizeof(uint32_t) - static_cast<unsigned long>(num_bytes);
   output_file.write(
       reinterpret_cast<const char *>(&code_big_endian) + ptr_offset, num_bytes);
+}
+
+inline auto out(std::string p, std::map<std::string, uint32_t> dict,
+                std::ofstream &output_file) {
+  if (auto sym = dict.find(p); sym != dict.end()) {
+    out_code(sym->second, output_file);
+  } else {
+    output_file << p;
+  } // output p code if in dict, otherwise output p
 }
 
 auto lzw_encode(std::ifstream &input_file, std::ofstream &output_file,
@@ -50,11 +55,7 @@ auto lzw_encode(std::ifstream &input_file, std::ofstream &output_file,
     if (reset_index++ == reset_frequency) {
       reset_index = 1;
       index = 256;
-      if (auto sym = dict.find(p); sym != dict.end()) {
-        out_code(sym->second, output_file);
-      } else {
-        output_file << p;
-      } // output p code if in dict, otherwise output p
+      out(p, dict, output_file);
       dict.clear();
       p = c;
       continue;
@@ -71,15 +72,11 @@ auto lzw_encode(std::ifstream &input_file, std::ofstream &output_file,
       dict.insert(std::make_pair(p, index++));
     } // insert into dictionary if not full
     p.pop_back(); // restore old p
-    if (auto sym = dict.find(p); sym != dict.end()) {
-      out_code(sym->second, output_file);
-    } else {
-      output_file << p;
-    } // output p code if in dict, otherwise output p
+    out(p, dict, output_file);
     p = c;
   }
 
-  output_file << p; // output remaining tokens (invariant: p is never in dict)
+  out(p, dict, output_file);
 }
 
 auto main(int argc, char *argv[]) -> int {
