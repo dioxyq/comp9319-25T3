@@ -21,6 +21,7 @@ inline auto out_code(uint32_t code, std::ofstream &output_file) {
 
 auto lzw(std::ifstream &input_file, std::ofstream &output_file,
          const uint32_t reset_frequency) {
+  // output reset frequency
   output_file << static_cast<char>((reset_frequency >> 24) & 0xFFU)
               << static_cast<char>((reset_frequency >> 16) & 0xFFU)
               << static_cast<char>((reset_frequency >> 8) & 0xFFU)
@@ -36,6 +37,7 @@ auto lzw(std::ifstream &input_file, std::ofstream &output_file,
   p = c;
 
   while (input_file.get(c)) {
+    // handle dictionary reset
     if (reset_index++ == reset_frequency) {
       reset_index = 0;
       index = 256;
@@ -45,28 +47,26 @@ auto lzw(std::ifstream &input_file, std::ofstream &output_file,
       continue;
     }
 
+    // p in dict
     p.push_back(c); // p becomes pc
-
     if (dict.find(p) != dict.end()) {
       continue;
     }
 
+    // p not in dict
     if (index < 1UL << 22) {
       dict.insert(std::make_pair(p, index++));
     } // insert into dictionary if not full
-
     p.pop_back(); // restore old p
-
     if (auto sym = dict.find(p); sym != dict.end()) {
       out_code(sym->second, output_file);
     } else {
       output_file << p;
-    } // print p code if in dict, otherwise print p
-
+    } // output p code if in dict, otherwise output p
     p = c;
   }
 
-  output_file << p;
+  output_file << p; // output remaining tokens (invariant: p is never in dict)
 }
 
 auto main(int argc, char *argv[]) -> int {
