@@ -48,10 +48,14 @@ auto lzw_encode(std::ifstream &input_file, std::ofstream &output_file,
   while (input_file.get(c)) {
     // handle dictionary reset
     if (reset_index++ == reset_frequency) {
-      reset_index = 0;
+      reset_index = 1;
       index = 256;
+      if (auto sym = dict.find(p); sym != dict.end()) {
+        out_code(sym->second, output_file);
+      } else {
+        output_file << p;
+      } // output p code if in dict, otherwise output p
       dict.clear();
-      output_file << p;
       p = c;
       continue;
     }

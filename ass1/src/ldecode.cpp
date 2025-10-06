@@ -24,17 +24,15 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
   uint32_t reset_index = 1;
   std::map<uint32_t, std::string> dict;
 
-  (void)reset_frequency;
-  (void)reset_index;
-
   input_file.get(c); // skip first symbol
   output_file << c;
   p = c;
 
   while (input_file.get(c)) {
     // handle dictionary reset
-    if (reset_index++ == reset_frequency) {
-      reset_index = 0;
+    if (reset_index >= reset_frequency) {
+      std::cout << reset_index << ':' << c << ' ';
+      reset_index = 1;
       index = 256;
       dict.clear();
       output_file << c;
@@ -45,18 +43,16 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
     unsigned char uc = static_cast<unsigned char>(c);
     std::string out;
 
-    if (uc < 0x80) { // regular char
+    if (uc < 0x80U) { // regular char
       out.push_back(c);
     } else { // 2-byte code
-      uint32_t code = 0x3F & uc;
+      uint32_t code = 0x3FU & uc;
       input_file.get(c);
-      reset_index++;
       code <<= 8;
       code |= static_cast<unsigned char>(c);
 
-      if (uc > 0xC0) { // 3-byte code
+      if (uc > 0xC0U) { // 3-byte code
         input_file.get(c);
-        reset_index++;
         code <<= 8;
         code |= static_cast<unsigned char>(c);
       }
@@ -66,7 +62,11 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
     }
 
     output_file << out;
-    dict.emplace(index++, p + out[0]);
+    reset_index += static_cast<uint32_t>(out.length());
+    if (index < 1U << 22) {
+      dict.emplace(index++, p + out[0]);
+      // std::cout << index << ": " << p + out[0] << '\n';
+    }
     p = out;
   }
 }
@@ -74,7 +74,7 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
 auto main(int argc, char *argv[]) -> int {
   // parse args
   if (argc != 3) {
-    std::cout << "usage: ldencode INPUT OUTPUT" << '\n';
+    std::cout << "usage: ldecode INPUT OUTPUT" << '\n';
     return 0;
   }
   std::ifstream input_file(argv[1]);
