@@ -3,29 +3,38 @@
 #include <iostream>
 #include <map>
 
+inline auto swap_endian(uint32_t x) -> uint32_t {
+  uint32_t r = 0;
+  for (auto i = 0; i <= 24; i += 8) {
+    r |= ((x & (0xFFU << i)) >> i) << (24 - i);
+  }
+  return r;
+}
+
 inline auto out_code_debug(uint32_t code, std::ofstream &output_file) {
   output_file << '<' << code << '>';
 }
 
 inline auto out_code(uint32_t code, std::ofstream &output_file) {
-  auto small = static_cast<char>(0xFFU & code);
-  auto mid = static_cast<char>(((0xFFU << 8) & code) >> 8);
-  if (code < 1UL << 14) {
-    mid |= static_cast<char>(0x80U);
-  } else {
-    auto big = static_cast<char>(0xC0U | (((0xFFU << 16) & code) >> 16));
-    output_file << big;
+  const auto num_bytes = 1 + (code >= 1U << 8) + (code >= 1U << 14);
+  if (num_bytes == 2) {
+    code |= 0x80U << 8; // begin 1
+  } else if (num_bytes == 3) {
+    code |= 0xC0U << 16; // begin 11
   }
-  output_file << mid << small;
+  const auto code_big_endian = swap_endian(code);
+  const auto ptr_offset =
+      sizeof(uint32_t) - static_cast<unsigned long>(num_bytes);
+  output_file.write(
+      reinterpret_cast<const char *>(&code_big_endian) + ptr_offset, num_bytes);
 }
 
-auto lzw(std::ifstream &input_file, std::ofstream &output_file,
-         const uint32_t reset_frequency) {
+auto lzw_encode(std::ifstream &input_file, std::ofstream &output_file,
+                const uint32_t reset_frequency) {
   // output reset frequency
-  output_file << static_cast<char>((reset_frequency >> 24) & 0xFFU)
-              << static_cast<char>((reset_frequency >> 16) & 0xFFU)
-              << static_cast<char>((reset_frequency >> 8) & 0xFFU)
-              << static_cast<char>(reset_frequency & 0xFFU);
+  auto rf_big_endian = swap_endian(reset_frequency);
+  output_file.write(reinterpret_cast<const char *>(&rf_big_endian),
+                    sizeof rf_big_endian);
 
   std::string p;
   char c;
@@ -79,5 +88,5 @@ auto main(int argc, char *argv[]) -> int {
   std::ofstream output_file(argv[2]);
   auto reset_frequency = static_cast<uint32_t>(std::stoul(argv[3]));
 
-  lzw(input_file, output_file, reset_frequency);
+  lzw_encode(input_file, output_file, reset_frequency);
 }
