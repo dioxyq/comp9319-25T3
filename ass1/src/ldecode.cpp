@@ -11,8 +11,13 @@ inline auto swap_endian(uint32_t x) -> uint32_t {
   return r;
 }
 
-auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
-                const uint32_t reset_frequency) {
+auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file) {
+  uint32_t reset_frequency;
+
+  input_file.read(reinterpret_cast<char *>(&reset_frequency),
+                  sizeof(reset_frequency));
+  reset_frequency = swap_endian(reset_frequency);
+
   std::string p;
   char c;
   uint32_t index = 256;
@@ -27,6 +32,16 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
   p = c;
 
   while (input_file.get(c)) {
+    // handle dictionary reset
+    if (reset_index++ == reset_frequency) {
+      reset_index = 0;
+      index = 256;
+      dict.clear();
+      output_file << c;
+      p = c;
+      continue;
+    }
+
     unsigned char uc = static_cast<unsigned char>(c);
     std::string out;
 
@@ -46,8 +61,6 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
         code |= static_cast<unsigned char>(c);
       }
 
-      // output_file << '<' << code << '>';
-
       // lookup code, handle edge case
       out.append(code > index ? p + p[0] : dict[code]);
     }
@@ -66,11 +79,6 @@ auto main(int argc, char *argv[]) -> int {
   }
   std::ifstream input_file(argv[1]);
   std::ofstream output_file(argv[2]);
-  uint32_t reset_frequency;
 
-  input_file.read(reinterpret_cast<char *>(&reset_frequency),
-                  sizeof(reset_frequency));
-  reset_frequency = swap_endian(reset_frequency);
-
-  lzw_decode(input_file, output_file, reset_frequency);
+  lzw_decode(input_file, output_file);
 }
