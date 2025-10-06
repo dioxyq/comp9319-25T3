@@ -33,7 +33,7 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
     if (uc < 0x80) { // regular char
       out.push_back(c);
     } else { // 2-byte code
-      uint32_t code = uc;
+      uint32_t code = 0x3F & uc;
       input_file.get(c);
       reset_index++;
       code <<= 8;
@@ -46,6 +46,8 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
         code |= static_cast<unsigned char>(c);
       }
 
+      // output_file << '<' << code << '>';
+
       // lookup code, handle edge case
       out.append(code > index ? p + p[0] : dict[code]);
     }
@@ -54,8 +56,6 @@ auto lzw_decode(std::ifstream &input_file, std::ofstream &output_file,
     dict.emplace(index++, p + out[0]);
     p = out;
   }
-
-  output_file << p; // output remaining tokens (invariant: p is never in dict)
 }
 
 auto main(int argc, char *argv[]) -> int {
