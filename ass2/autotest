@@ -1,0 +1,46 @@
+#!/bin/bash
+#set -x #echo on
+
+echo "This sanity test only runs tests on dna-tiny.rbwt"
+echo "It does not check the timings nor memory usage."
+echo 
+
+rm -f bwtdecode bwtsearch *.o
+
+make
+
+echo
+
+rm -rf out
+mkdir out
+
+if [ -f bwtdecode ] ; then
+    ./bwtdecode tests/dna-tiny.rbwt out/tiny.dec
+    touch out/tiny.dec  
+    correct=`eval diff -q tests/dna-tiny.txt out/tiny.dec`
+    if [ -z "$correct" ]; then
+      echo "Passed decoding dna-tiny.rbwt"
+    else
+      echo "Failed decoding dna-tiny.rbwt"
+    fi
+else
+    echo "Failed to make bwtdecode."
+fi
+
+if [ -f bwtsearch ] ; then
+    ./bwtsearch tests/dna-tiny.rbwt < tests/dna-tiny.input > out/tiny.out
+    touch out/tiny.out
+    wrong=`diff tests/dna-tiny.output out/tiny.out | grep "^<" | wc -l`
+    tot=$(( 10 - $wrong ))
+    echo "Passed $tot search terms out of 10 for searching dna-tiny.rbwt" 
+
+    ./bwtsearch tests/dna-tiny.rbwt < tests/dna-tiny.input2 > out/tiny2.out
+    touch out/tiny.out
+    wrong=`diff tests/dna-tiny.output2 out/tiny2.out | grep "^<" | wc -l`
+    tot=$(( 5 - $wrong ))
+    echo "Passed $tot search terms out of 5 for searching dna-tiny.rbwt"
+else
+    echo "Failed to make bwtsearch."
+fi
+
+echo
