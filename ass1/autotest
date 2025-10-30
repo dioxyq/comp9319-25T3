@@ -1,0 +1,75 @@
+#!/bin/bash
+#set -x #echo on
+
+echo "Testing - total 5 tests, 3 checks (lencode, ldecode) per test..."
+
+# COMPILE
+cd build
+make
+cd ..
+
+# CLEAN OUTPUT FILES
+cd tmp
+rm -f *.bin *.out
+
+# ENCODE
+if [ -f ../build/lencode ] ; then
+
+    ./../build/lencode ../tests/test1.txt test1.bin 10
+    ./../build/lencode ../tests/test2.txt test2.bin 245
+    ./../build/lencode ../tests/test3.txt test3.bin 5000
+    ./../build/lencode ../tests/test4.txt test4.bin 49
+    ./../build/lencode ../tests/test5.txt test5.bin 400
+    
+    for ((k=1;k<6;++k))
+    do
+	touch test$k.bin
+	correct=`eval diff -q ../tests/test$k.lzw test$k.bin`
+	if [ -z "$correct" ]; then
+	    echo "lencode test $k: CORRECT"
+	else
+	    echo "lencode test $k: FAILED"
+	fi
+    done
+    
+else
+    echo "Failed to compile lencode."
+fi
+
+# DECODE
+if [ -f ../build/ldecode ] ; then
+
+    for ((k=1;k<6;++k))
+    do
+        ./../build/ldecode test$k.bin test$k.out
+	touch test$k.out
+        correct=`eval diff -q ../tests/test$k.txt test$k.out`
+        if [ -z "$correct" ]; then
+            echo "ldecode with your encoded file $k: CORRECT"
+        else
+            echo "ldecode with your encoded file $k: FAILED"
+        fi
+    done
+
+    rm -f *.out
+
+    for ((k=1;k<6;++k))
+    do
+        ./../build/ldecode ../tests/test$k.lzw test$k.out
+	touch test$k.out
+        correct=`eval diff -q ../tests/test$k.txt test$k.out`
+        if [ -z "$correct" ]; then
+            echo "ldecode with our encoded file $k: CORRECT"
+        else
+            echo "ldecode with our encoded file $k: FAILED"
+        fi
+    done
+
+else
+    echo "Failed to compile ldecode."
+fi
+
+
+
+
+

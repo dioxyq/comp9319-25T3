@@ -25,7 +25,9 @@ inline auto out_code(uint32_t code, std::ofstream &output_file) {
       reinterpret_cast<const char *>(&code_big_endian) + ptr_offset, num_bytes);
 }
 
-inline auto out(std::string p, std::map<std::string, uint32_t> dict,
+// in submission, dict was unintentionally passed by value instead of by
+// reference, leading to massive slowdown
+inline auto out(std::string p, std::map<std::string, uint32_t> &dict,
                 std::ofstream &output_file) {
   if (auto sym = dict.find(p); sym != dict.end()) {
     out_code(sym->second, output_file);

@@ -1,0 +1,84 @@
+#!/bin/bash
+#set -x #echo on
+
+echo "Auto marking - total 15 tests (5 lencode & 10 ldecode)"
+echo "Y means Passed; N means Failed"
+echo "---"
+
+# COMPILE
+cd build
+make
+cd ..
+
+# CLEAN OUTPUT FILES
+cd tmp
+rm -f *.enc *.dec*
+
+# ENCODE
+if [ -f ../build/lencode ] ; then
+
+    for ((k=6;k<9;++k))
+    do
+	timeout 15 ../build/lencode ../tests/test$k.txt test$k.enc 5000
+	touch test$k.enc
+	correct=`eval diff -q ../tests/test$k.lzw test$k.enc`
+	if [ -z "$correct" ]; then
+	    echo "lencode for test$k.txt: Y"
+	else
+	    echo "lencode for test$k.txt: N"
+	fi
+    done
+
+    for ((k=9;k<11;++k))
+    do
+        timeout 15 ../build/lencode ../tests/test$k.txt test$k.enc 500000
+        touch test$k.enc
+        correct=`eval diff -q ../tests/test$k.lzw test$k.enc`
+        if [ -z "$correct" ]; then
+            echo "lencode for test$k.txt: Y"
+        else
+            echo "lencode for test$k.txt: N"
+        fi
+    done
+    
+else
+    echo "Failed to compile lencode."
+fi
+
+# DECODE
+if [ -f ../build/ldecode ] ; then
+
+    # decode using the provided lzw files
+    for ((k=6;k<11;++k))
+    do
+        timeout 15 ../build/ldecode ../tests/test$k.lzw test$k.dec1
+        touch test$k.dec1
+        correct=`eval diff -q ../tests/test$k.txt test$k.dec1`
+        if [ -z "$correct" ]; then
+            echo "ldecode for test$k.lzw: Y"
+        else
+            echo "ldecode for test$k.lzw: N"
+        fi
+    done
+
+    # decode using your generated lzw files
+    for ((k=6;k<11;++k))
+    do
+        timeout 15 ../build/ldecode test$k.enc test$k.dec2
+        touch test$k.dec2
+        correct=`eval diff -q ../tests/test$k.txt test$k.dec2`
+        if [ -z "$correct" ]; then
+            echo "ldecode for test$k.enc: Y"
+        else
+            echo "ldecode for test$k.enc: N"
+        fi
+    done
+    
+else
+    echo "Failed to compile ldecode."
+fi
+
+
+
+
+
