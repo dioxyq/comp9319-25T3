@@ -59,7 +59,8 @@ void print_rlfm_b(RLFM *rlfm) {
 }
 
 void print_rlfm(RLFM *rlfm) {
-    printf("s_len: %zu, b_len: %zu, ", rlfm->S.len, rlfm->B.len);
+    printf("s_size: %zu, b_size: %zu, s_len: %zu, b_len: %zu, ", rlfm->S.size,
+           rlfm->B.size, rlfm->S.len, rlfm->B.len);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", rlfm->C[0], rlfm->C[1],
            rlfm->C[2], rlfm->C[3]);
 }
@@ -147,8 +148,6 @@ void read_rlfm(RLFM *rlfm, FILE *file, size_t file_size) {
     rlfm->S.data = realloc(rlfm->S.data, rlfm->S.size);
     rlfm->B.data = realloc(rlfm->B.data, rlfm->B.size);
 
-    /* printf("alloc s:%zu b:%zu\n", s_offset + 1, b_offset + 1); */
-
     free(buf);
 }
 
@@ -186,7 +185,7 @@ int main(int argc, char *argv[]) {
     decode_out(rlfm, output_file);
     fclose(output_file);
 
-    /* print_rlfm(rlfm); */
+    print_rlfm(rlfm);
     /* print_rlfm_s(rlfm); */
     /* print_rlfm_b(rlfm); */
 
