@@ -17,6 +17,7 @@ typedef struct {
     char *S;
     char *B;
     char *Bp;
+    unsigned int C[4];
     size_t s_len;
     size_t b_len;
     size_t s_end;
@@ -52,27 +53,36 @@ void print_fm_b(FM_Index *fm) {
     printf("\n");
 }
 
-FM_Index *read_fm(FILE *file) {
-    struct stat stat_buf;
-    fstat(fileno(file), &stat_buf);
-    size_t file_size = stat_buf.st_size;
+void print_fm(FM_Index *fm) {
+    printf("s_len: %zu, b_len: %zu\n", fm->s_len, fm->b_len);
+    printf("C: [A: %d, C: %d, G: %d, T: %d]\n", fm->C[0], fm->C[1], fm->C[2],
+           fm->C[3]);
+    printf("\n");
+}
 
+FM_Index *init_fm(size_t file_size) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
     size_t b_size = max(MIN_ALLOC, file_size * BT_RATIO_HEURISTIC);
     size_t bp_size = b_size;
-
-    printf("%zu %zu", s_size, b_size);
 
     FM_Index *fm = malloc(sizeof(FM_Index));
 
     fm->S = calloc(s_size, 1);
     fm->B = calloc(b_size, 1);
     fm->Bp = NULL;
+    fm->C[0] = 0;
+    fm->C[1] = 0;
+    fm->C[2] = 0;
+    fm->C[3] = 0;
     fm->s_len = 0;
     fm->b_len = 0;
     fm->s_end = 0;
     fm->b_end = 0;
 
+    return fm;
+}
+
+void read_fm(FM_Index *fm, FILE *file, size_t file_size) {
     char *buf = malloc(READ_BUF_SIZE);
     size_t bytes_to_read = file_size;
     size_t bytes_left = min(READ_BUF_SIZE, bytes_to_read);
@@ -98,6 +108,8 @@ FM_Index *read_fm(FILE *file) {
             }
 
             if (code != last_code) {
+                fm->C[code] += 1;
+
                 fm->S[s_offset] |= code << s_bit_offset;
                 // branchlessly update s offsets
                 s_offset += (s_bit_offset == 6);
@@ -121,12 +133,19 @@ FM_Index *read_fm(FILE *file) {
         size_t bytes_left = min(READ_BUF_SIZE, bytes_to_read);
     }
 
+    fm->C[1] += fm->C[0];
+    fm->C[2] += fm->C[1];
+    fm->C[3] += fm->C[2];
+
     fm->s_len = s_offset * 4 + s_bit_offset / 2;
     fm->b_len = b_offset * 8 + b_bit_offset;
 
-    free(buf);
+    fm->S = realloc(fm->S, s_offset + 1);
+    fm->B = realloc(fm->B, b_offset + 1);
 
-    return fm;
+    /* printf("alloc s:%zu b:%zu\n", s_offset + 1, b_offset + 1); */
+
+    free(buf);
 }
 
 int main(int argc, char *argv[]) {
@@ -141,11 +160,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    FM_Index *fm = read_fm(file);
+    struct stat stat_buf;
+    fstat(fileno(file), &stat_buf);
+    size_t file_size = stat_buf.st_size;
+
+    FM_Index *fm = init_fm(file_size);
+    read_fm(fm, file, file_size);
     fclose(file);
 
-    // print_fm_s(fm);
-    // print_fm_b(fm);
+    print_fm(fm);
+    /* print_fm_s(fm); */
+    /* print_fm_b(fm); */
 
     free(fm->S);
     free(fm->B);
