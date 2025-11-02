@@ -14,23 +14,28 @@ const float ST_RATIO_HEURISTIC = 0.25;
 const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 
 typedef struct {
-    char *S;
-    char *B;
-    char *Bp;
-    unsigned int C[4];
-    size_t s_len;
-    size_t b_len;
-    size_t s_end;
-    size_t b_end;
-} FM_Index;
+    char *data;
+    size_t size;
+    size_t len;
+    size_t end;
+} Index;
 
-void print_fm_s(FM_Index *fm) {
-    for (size_t i = 0; i < (fm->s_len + 3) / 4; ++i) {
-        char byte = fm->S[i];
+const Index NEW_INDEX = {.data = NULL, .size = 0, .len = 0, .end = 0};
+
+typedef struct {
+    Index S;
+    Index B;
+    Index Bp;
+    unsigned int C[4];
+} RLFM;
+
+void print_rlfm_s(RLFM *rlfm) {
+    for (size_t i = 0; i < (rlfm->S.len + 3) / 4; ++i) {
+        char byte = rlfm->S.data[i];
         char buf[5] = {'\n'};
         int print_end = 0;
-        for (int j = 0; j < min(4, fm->s_len - i * 4); ++j) {
-            if (i * 4 + j == fm->s_end) {
+        for (int j = 0; j < min(4, rlfm->S.len - i * 4); ++j) {
+            if (i * 4 + j == rlfm->S.end) {
                 buf[j] = '#';
                 print_end = 1;
             }
@@ -42,10 +47,10 @@ void print_fm_s(FM_Index *fm) {
     printf("\n");
 }
 
-void print_fm_b(FM_Index *fm) {
-    for (size_t i = 0; i < (fm->b_len + 7) / 8; ++i) {
-        char byte = fm->B[i];
-        for (int j = 0; j < min(8, fm->b_len - i * 8); ++j) {
+void print_rlfm_b(RLFM *rlfm) {
+    for (size_t i = 0; i < (rlfm->B.len + 7) / 8; ++i) {
+        char byte = rlfm->B.data[i];
+        for (int j = 0; j < min(8, rlfm->B.len - i * 8); ++j) {
             char bit = (byte & (1 << j)) >> j;
             printf("%d", bit);
         }
@@ -53,35 +58,33 @@ void print_fm_b(FM_Index *fm) {
     printf("\n");
 }
 
-void print_fm(FM_Index *fm) {
-    printf("s_len: %zu, b_len: %zu, ", fm->s_len, fm->b_len);
-    printf("C: [A: %d, C: %d, G: %d, T: %d]\n", fm->C[0], fm->C[1], fm->C[2],
-           fm->C[3]);
+void print_rlfm(RLFM *rlfm) {
+    printf("s_len: %zu, b_len: %zu, ", rlfm->S.len, rlfm->B.len);
+    printf("C: [A: %d, C: %d, G: %d, T: %d]\n", rlfm->C[0], rlfm->C[1],
+           rlfm->C[2], rlfm->C[3]);
 }
 
-FM_Index *init_fm(size_t file_size) {
+RLFM *init_rlfm(size_t file_size) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
     size_t b_size = max(MIN_ALLOC, file_size * BT_RATIO_HEURISTIC);
     size_t bp_size = b_size;
 
-    FM_Index *fm = malloc(sizeof(FM_Index));
+    RLFM *rlfm = malloc(sizeof(RLFM));
 
-    fm->S = calloc(s_size, 1);
-    fm->B = calloc(b_size, 1);
-    fm->Bp = NULL;
-    fm->C[0] = 0;
-    fm->C[1] = 0;
-    fm->C[2] = 0;
-    fm->C[3] = 0;
-    fm->s_len = 0;
-    fm->b_len = 0;
-    fm->s_end = 0;
-    fm->b_end = 0;
+    rlfm->S = NEW_INDEX;
+    rlfm->S.data = calloc(s_size, 1);
+    rlfm->B = NEW_INDEX;
+    rlfm->B.data = calloc(b_size, 1);
+    rlfm->Bp = NEW_INDEX;
+    rlfm->C[0] = 0;
+    rlfm->C[1] = 0;
+    rlfm->C[2] = 0;
+    rlfm->C[3] = 0;
 
-    return fm;
+    return rlfm;
 }
 
-void read_fm(FM_Index *fm, FILE *file, size_t file_size) {
+void read_rlfm(RLFM *rlfm, FILE *file, size_t file_size) {
     char *buf = malloc(READ_BUF_SIZE);
     size_t bytes_to_read = file_size;
     size_t bytes_left = min(READ_BUF_SIZE, bytes_to_read);
@@ -100,23 +103,23 @@ void read_fm(FM_Index *fm, FILE *file, size_t file_size) {
 
             // branch predictor should effectively ignore this
             if (code == 4) {
-                fm->s_end = s_offset * 4 + s_bit_offset / 2;
-                fm->b_end = b_offset * 8 + b_bit_offset;
+                rlfm->S.end = s_offset * 4 + s_bit_offset / 2;
+                rlfm->B.end = b_offset * 8 + b_bit_offset;
                 last_code = code;
                 continue;
             }
 
             if (code != last_code) {
-                fm->C[code] += 1;
+                rlfm->C[code] += 1;
 
-                fm->S[s_offset] |= code << s_bit_offset;
+                rlfm->S.data[s_offset] |= code << s_bit_offset;
                 // branchlessly update s offsets
                 s_offset += (s_bit_offset == 6);
                 s_bit_offset = (s_bit_offset + 2) * (s_bit_offset < 6);
 
                 last_code = code;
 
-                fm->B[b_offset] |= 1 << b_bit_offset;
+                rlfm->B.data[b_offset] |= 1 << b_bit_offset;
                 // branchlessly update b offsets for 1
                 b_offset += (b_bit_offset == 7);
                 b_bit_offset = (b_bit_offset + 1) * (b_bit_offset < 7);
@@ -132,26 +135,28 @@ void read_fm(FM_Index *fm, FILE *file, size_t file_size) {
         size_t bytes_left = min(READ_BUF_SIZE, bytes_to_read);
     }
 
-    fm->C[1] += fm->C[0];
-    fm->C[2] += fm->C[1];
-    fm->C[3] += fm->C[2];
+    rlfm->C[1] += rlfm->C[0];
+    rlfm->C[2] += rlfm->C[1];
+    rlfm->C[3] += rlfm->C[2];
 
-    fm->s_len = s_offset * 4 + s_bit_offset / 2;
-    fm->b_len = b_offset * 8 + b_bit_offset;
+    rlfm->S.size = s_offset + 1;
+    rlfm->B.size = b_offset + 1;
+    rlfm->S.len = s_offset * 4 + s_bit_offset / 2;
+    rlfm->B.len = b_offset * 8 + b_bit_offset;
 
-    fm->S = realloc(fm->S, s_offset + 1);
-    fm->B = realloc(fm->B, b_offset + 1);
+    rlfm->S.data = realloc(rlfm->S.data, rlfm->S.size);
+    rlfm->B.data = realloc(rlfm->B.data, rlfm->B.size);
 
     /* printf("alloc s:%zu b:%zu\n", s_offset + 1, b_offset + 1); */
 
     free(buf);
 }
 
-void derive_bp(FM_Index *fm) {
+void derive_bp(RLFM *fm) {
     // TODO:
 }
 
-void decode_out(FM_Index *fm, FILE *file) {
+void decode_out(RLFM *fm, FILE *file) {
     // TODO:
 }
 
@@ -171,21 +176,22 @@ int main(int argc, char *argv[]) {
     fstat(fileno(input_file), &stat_buf);
     size_t file_size = stat_buf.st_size;
 
-    FM_Index *fm = init_fm(file_size);
-    read_fm(fm, input_file, file_size);
+    RLFM *rlfm = init_rlfm(file_size);
+    read_rlfm(rlfm, input_file, file_size);
     fclose(input_file);
 
-    derive_bp(fm);
+    derive_bp(rlfm);
 
     FILE *output_file = fopen(argv[2], "w");
-    decode_out(fm, output_file);
+    decode_out(rlfm, output_file);
     fclose(output_file);
 
-    /* print_fm(fm); */
-    /* print_fm_s(fm); */
-    /* print_fm_b(fm); */
+    /* print_rlfm(rlfm); */
+    /* print_rlfm_s(rlfm); */
+    /* print_rlfm_b(rlfm); */
 
-    free(fm->S);
-    free(fm->B);
-    free(fm);
+    free(rlfm->S.data);
+    free(rlfm->B.data);
+    /* free(rlfm->Bp.data); */
+    free(rlfm);
 }
