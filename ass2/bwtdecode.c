@@ -6,11 +6,12 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 const char ENCODING[5] = {'A', 'C', 'G', 'T', '\n'};
+const size_t KIBIBYTE = 1024;
 const size_t MEBIBYTE = 1024 * 1024;
 const size_t MIN_ALLOC = MEBIBYTE;
 const float BT_RATIO_HEURISTIC = 0.22;
 const float ST_RATIO_HEURISTIC = 0.25;
-const size_t READ_BUF_SIZE = 2 * MEBIBYTE;
+const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 
 typedef struct {
     char *S;
@@ -59,6 +60,8 @@ FM_Index *read_fm(FILE *file) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
     size_t b_size = max(MIN_ALLOC, file_size * BT_RATIO_HEURISTIC);
     size_t bp_size = b_size;
+
+    printf("%zu %zu", s_size, b_size);
 
     FM_Index *fm = malloc(sizeof(FM_Index));
 
@@ -121,6 +124,8 @@ FM_Index *read_fm(FILE *file) {
     fm->s_len = s_offset * 4 + s_bit_offset / 2;
     fm->b_len = b_offset * 8 + b_bit_offset;
 
+    free(buf);
+
     return fm;
 }
 
@@ -139,6 +144,10 @@ int main(int argc, char *argv[]) {
     FM_Index *fm = read_fm(file);
     fclose(file);
 
-    print_fm_s(fm);
-    print_fm_b(fm);
+    // print_fm_s(fm);
+    // print_fm_b(fm);
+
+    free(fm->S);
+    free(fm->B);
+    free(fm);
 }
