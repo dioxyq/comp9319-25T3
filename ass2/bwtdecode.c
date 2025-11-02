@@ -54,10 +54,9 @@ void print_fm_b(FM_Index *fm) {
 }
 
 void print_fm(FM_Index *fm) {
-    printf("s_len: %zu, b_len: %zu\n", fm->s_len, fm->b_len);
+    printf("s_len: %zu, b_len: %zu, ", fm->s_len, fm->b_len);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", fm->C[0], fm->C[1], fm->C[2],
            fm->C[3]);
-    printf("\n");
 }
 
 FM_Index *init_fm(size_t file_size) {
@@ -148,27 +147,41 @@ void read_fm(FM_Index *fm, FILE *file, size_t file_size) {
     free(buf);
 }
 
+void derive_bp(FM_Index *fm) {
+    // TODO:
+}
+
+void decode_out(FM_Index *fm, FILE *file) {
+    // TODO:
+}
+
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("usage: bwtdecode FILE\n");
+    if (argc != 3) {
+        printf("usage: bwtdecode INPUT_FILE OUTPUT_FILE\n");
         return 1;
     }
 
-    FILE *file = fopen(argv[1], "rb");
-    if (file == NULL) {
-        printf("file not found\n");
+    FILE *input_file = fopen(argv[1], "rb");
+    if (input_file == NULL) {
+        printf("input file not found\n");
         return 1;
     }
 
     struct stat stat_buf;
-    fstat(fileno(file), &stat_buf);
+    fstat(fileno(input_file), &stat_buf);
     size_t file_size = stat_buf.st_size;
 
     FM_Index *fm = init_fm(file_size);
-    read_fm(fm, file, file_size);
-    fclose(file);
+    read_fm(fm, input_file, file_size);
+    fclose(input_file);
 
-    print_fm(fm);
+    derive_bp(fm);
+
+    FILE *output_file = fopen(argv[2], "w");
+    decode_out(fm, output_file);
+    fclose(output_file);
+
+    /* print_fm(fm); */
     /* print_fm_s(fm); */
     /* print_fm_b(fm); */
 
