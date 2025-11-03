@@ -55,6 +55,7 @@ size_t rank_s(Index *s, size_t pos, unsigned char code) {
     for (int i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
         count += code == ((byte & (0b11 << i)) >> i);
     };
+    count -= (!code) * (pos >= s->end);
     return count;
 }
 
@@ -89,7 +90,7 @@ size_t rank_b(Index *b, size_t pos) {
         count += COUNT_ONES[b->data[i]];
     }
     // count remaining bits from pos - 7 to pos
-    count += COUNT_ONES[0xFF >> (7 - (pos % 8)) & b->data[pos / 8]];
+    count += COUNT_ONES[(0xFF >> (7 - (pos % 8))) & b->data[pos / 8]];
     return count;
 }
 
@@ -266,7 +267,28 @@ void derive_bp(RLFM *rlfm) {
 }
 
 void decode_out(RLFM *rlfm, FILE *file) {
-    // TODO:
+    size_t i = rlfm->B.end;
+    unsigned char c_code = 4;
+    size_t cs_c = 1;
+    fputc(ENCODING[c_code], file);
+    int start = 1;
+
+    while (i != rlfm->B.end || start) {
+        start = 0;
+        printf("%zu %c\n", i, ENCODING[c_code]);
+        i = select_b(&rlfm->Bp,
+                     cs_c + rank_s(&rlfm->S, rank_b(&rlfm->B, i), c_code)) +
+            i - select_b(&rlfm->B, rank_b(&rlfm->B, i));
+
+        size_t code_pos = rank_b(&rlfm->B, i) - 1;
+        c_code =
+            ((0b11 << (2 * (code_pos % 4))) & (rlfm->S.data[code_pos / 4])) >>
+            (2 * (code_pos % 4));
+
+        cs_c = rlfm->Cs[c_code] - rlfm->Cs[0] + 1;
+
+        fputc(ENCODING[c_code], file);
+    }
 }
 
 int main(int argc, char *argv[]) {
