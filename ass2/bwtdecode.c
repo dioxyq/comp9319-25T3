@@ -41,32 +41,48 @@ typedef struct {
     unsigned int Cs[4];
 } RLFM;
 
-// pos must be in bounds
-size_t rank_b(Index *index, size_t pos) {
+size_t rank_s(Index *s, size_t pos, unsigned char code) {
     size_t count = 0;
-    for (size_t j = 0; j < pos / 8; j++) {
-        count += COUNT_ONES[index->data[j]];
+    for (size_t i = 0; i < pos / 4; ++i) {
+        unsigned char byte = s->data[i];
+        for (int j = 0; j < 8; j += 2) {
+            count += code == ((byte & (0b11 << j)) >> j);
+        };
     }
-    // count remaining bits from i - 7 to i
-    count += COUNT_ONES[0xFF >> (7 - (pos % 8)) & index->data[pos / 8]];
+    // count remaining codes from pos - 3 to pos
+    unsigned char byte = s->data[pos / 4];
+    for (int i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
+        count += code == ((byte & (0b11 << i)) >> i);
+    };
+    return count;
+}
+
+// pos must be in bounds
+size_t rank_b(Index *b, size_t pos) {
+    size_t count = 0;
+    for (size_t i = 0; i < pos / 8; i++) {
+        count += COUNT_ONES[b->data[i]];
+    }
+    // count remaining bits from pos - 7 to pos
+    count += COUNT_ONES[0xFF >> (7 - (pos % 8)) & b->data[pos / 8]];
     return count;
 }
 
 // count must be less than s->len
-size_t select_b(Index *index, size_t count) {
-    size_t j = 0;
+size_t select_b(Index *b, size_t count) {
+    size_t i = 0;
     size_t sum = 0;
-    for (; sum < count; j++) {
-        sum += COUNT_ONES[index->data[j]];
+    for (; sum < count; i++) {
+        sum += COUNT_ONES[b->data[i]];
     }
-    size_t pos = (j - 1) * 8;
+    size_t pos = (i - 1) * 8;
+    // correctly count overshoot byte
     if (sum > count) {
-        sum -= COUNT_ONES[index->data[j]];
-        for (int i = 0; i < 8; i++) {
-            // count remaining bits from i - 7 to i
-            size_t n = COUNT_ONES[0xFF >> (7 - i) & index->data[j]];
+        sum -= COUNT_ONES[b->data[i]];
+        for (int j = 0; j < 8; j++) {
+            size_t n = COUNT_ONES[0xFF >> (7 - j) & b->data[i]];
             if (n == count - sum) {
-                pos += i;
+                pos += j;
                 break;
             }
         }
