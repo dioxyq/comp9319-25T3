@@ -32,7 +32,7 @@ typedef struct {
 void print_rlfm_s(RLFM *rlfm) {
     for (size_t i = 0; i < (rlfm->S.len + 3) / 4; ++i) {
         char byte = rlfm->S.data[i];
-        char buf[5] = {'\n'};
+        char buf[6] = {'\0'};
         int print_end = 0;
         for (int j = 0; j < min(4, rlfm->S.len - i * 4); ++j) {
             if (i * 4 + j == rlfm->S.end) {
