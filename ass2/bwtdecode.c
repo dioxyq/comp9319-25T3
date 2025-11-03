@@ -41,6 +41,7 @@ typedef struct {
     unsigned int Cs[4];
 } RLFM;
 
+// pos must be in bounds
 size_t rank_s(Index *s, size_t pos, unsigned char code) {
     size_t count = 0;
     for (size_t i = 0; i < pos / 4; ++i) {
@@ -57,6 +58,23 @@ size_t rank_s(Index *s, size_t pos, unsigned char code) {
     return count;
 }
 
+// count must be less than s->len
+size_t select_s(Index *s, size_t count, unsigned char code) {
+    size_t sum = 0;
+    size_t i = 0;
+    int j = 0;
+    for (; sum < count; i++) {
+        unsigned char byte = s->data[i];
+        for (j = 0; j < 8; j += 2) {
+            sum += code == ((byte & (0b11 << j)) >> j);
+            if (sum == count) {
+                break;
+            }
+        };
+    }
+    return (i - 1) * 4 + j / 2;
+}
+
 // pos must be in bounds
 size_t rank_b(Index *b, size_t pos) {
     size_t count = 0;
@@ -70,33 +88,32 @@ size_t rank_b(Index *b, size_t pos) {
 
 // count must be less than s->len
 size_t select_b(Index *b, size_t count) {
-    size_t i = 0;
     size_t sum = 0;
+    size_t i = 0;
     for (; sum < count; i++) {
         sum += COUNT_ONES[b->data[i]];
     }
     size_t pos = (i - 1) * 8;
     // correctly count overshoot byte
     if (sum > count) {
-        sum -= COUNT_ONES[b->data[i]];
-        for (int j = 0; j < 8; j++) {
-            size_t n = COUNT_ONES[0xFF >> (7 - j) & b->data[i]];
-            if (n == count - sum) {
-                pos += j;
-                break;
-            }
+        unsigned char byte = b->data[i];
+        sum -= COUNT_ONES[byte];
+        int j = 0;
+        for (; sum < count; j++) {
+            sum += ((1 << j) & b->data[i]) >> j;
         }
+        pos += j - 1;
     }
     return pos;
 }
 
-void print_rlfm_s(RLFM *rlfm) {
-    for (size_t i = 0; i < (rlfm->S.len + 3) / 4; ++i) {
-        char byte = rlfm->S.data[i];
+void print_rlfm_s(Index *s) {
+    for (size_t i = 0; i < (s->len + 3) / 4; ++i) {
+        char byte = s->data[i];
         char buf[5] = {'\0'};
-        for (int j = 0; j < min(4, rlfm->S.len - i * 4); ++j) {
+        for (int j = 0; j < min(4, s->len - i * 4); ++j) {
             char code = (byte & (0b11 << (2 * j))) >> (2 * j);
-            if (i * 4 + j == rlfm->S.end) {
+            if (i * 4 + j == s->end) {
                 code = 4;
             }
             buf[j] = ENCODING[code];
@@ -106,10 +123,10 @@ void print_rlfm_s(RLFM *rlfm) {
     printf("\n");
 }
 
-void print_rlfm_b(RLFM *rlfm) {
-    for (size_t i = 0; i < (rlfm->B.len + 7) / 8; ++i) {
-        char byte = rlfm->B.data[i];
-        for (int j = 0; j < min(8, rlfm->B.len - i * 8); ++j) {
+void print_rlfm_b(Index *b) {
+    for (size_t i = 0; i < (b->len + 7) / 8; ++i) {
+        char byte = b->data[i];
+        for (int j = 0; j < min(8, b->len - i * 8); ++j) {
             char bit = (byte & (1 << j)) >> j;
             printf("%d", bit);
         }
@@ -198,8 +215,8 @@ void read_rlfm(RLFM *rlfm, FILE *file, size_t file_size) {
     rlfm->Cs[2] += rlfm->Cs[1];
     rlfm->Cs[3] += rlfm->Cs[2];
 
-    rlfm->S.size = s_offset + 1;
-    rlfm->B.size = b_offset + 1;
+    rlfm->S.size = s_offset + (s_bit_offset != 0);
+    rlfm->B.size = b_offset + (b_bit_offset != 0);
     rlfm->S.len = s_offset * 4 + s_bit_offset / 2;
     rlfm->B.len = b_offset * 8 + b_bit_offset;
 
@@ -209,11 +226,34 @@ void read_rlfm(RLFM *rlfm, FILE *file, size_t file_size) {
     free(buf);
 }
 
-void derive_bp(RLFM *fm) {
-    // TODO:
+void derive_bp(RLFM *rlfm) {
+    rlfm->Bp.size = rlfm->B.size;
+    rlfm->Bp.len = rlfm->B.len;
+    rlfm->Bp.end = 0;
+    rlfm->Bp.data = calloc(rlfm->Bp.size, 1);
+
+    // '\n' goes at the start
+    rlfm->Bp.data[0] |= 0b10000000;
+
+    size_t bp_pos = 1;
+    size_t fs_pos = 1;
+
+    for (unsigned char code = 0; code < 4; ++code) {
+        size_t curr_c_offset = fs_pos;
+        for (; fs_pos < rlfm->Cs[code]; ++fs_pos) {
+            size_t s_pos = select_s(&rlfm->S, fs_pos - curr_c_offset + 1, code);
+            size_t b_pos = select_b(&rlfm->B, s_pos + 1);
+            /* printf("s%zub%zu ", s_pos, b_pos); */
+            rlfm->Bp.data[b_pos / 8] |= 1 << (b_pos % 8);
+
+            size_t b_end = select_b(&rlfm->B, s_pos + 1);
+            bp_pos += b_end - b_pos;
+        }
+    }
+    printf("\n");
 }
 
-void decode_out(RLFM *fm, FILE *file) {
+void decode_out(RLFM *rlfm, FILE *file) {
     // TODO:
 }
 
@@ -244,11 +284,12 @@ int main(int argc, char *argv[]) {
     fclose(output_file);
 
     print_rlfm(rlfm);
-    /* print_rlfm_s(rlfm); */
-    /* print_rlfm_b(rlfm); */
+    print_rlfm_s(&rlfm->S);
+    print_rlfm_b(&rlfm->B);
+    print_rlfm_b(&rlfm->Bp);
 
     free(rlfm->S.data);
     free(rlfm->B.data);
-    /* free(rlfm->Bp.data); */
+    free(rlfm->Bp.data);
     free(rlfm);
 }
