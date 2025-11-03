@@ -63,11 +63,18 @@ size_t select_s(Index *s, size_t count, unsigned char code) {
     size_t sum = 0;
     size_t i = 0;
     int j = 0;
+    int passed_end = 0;
     for (; sum < count; i++) {
         unsigned char byte = s->data[i];
         for (j = 0; j < 8; j += 2) {
             sum += code == ((byte & (0b11 << j)) >> j);
             if (sum == count) {
+                // handle edge case for end symbol
+                if (!passed_end && !code && (i * 4 + j / 2) >= s->end) {
+                    --sum;
+                    passed_end = 1;
+                    continue;
+                }
                 break;
             }
         };
@@ -90,17 +97,18 @@ size_t rank_b(Index *b, size_t pos) {
 size_t select_b(Index *b, size_t count) {
     size_t sum = 0;
     size_t i = 0;
-    for (; sum < count; i++) {
+    for (; sum < count && i <= b->len / 8; i++) {
         sum += COUNT_ONES[b->data[i]];
     }
-    size_t pos = (i - 1) * 8;
-    // correctly count overshoot byte
-    if (sum > count) {
+    --i;
+    size_t pos = i * 8;
+    //  correctly count overshoot byte
+    if (sum >= count) {
         unsigned char byte = b->data[i];
         sum -= COUNT_ONES[byte];
         int j = 0;
         for (; sum < count; j++) {
-            sum += ((1 << j) & b->data[i]) >> j;
+            sum += ((1 << j) & byte) >> j;
         }
         pos += j - 1;
     }
@@ -135,8 +143,10 @@ void print_rlfm_b(Index *b) {
 }
 
 void print_rlfm(RLFM *rlfm) {
-    printf("s_size: %zu, b_size: %zu, s_len: %zu, b_len: %zu, ", rlfm->S.size,
-           rlfm->B.size, rlfm->S.len, rlfm->B.len);
+    printf("s_size: %zu, b_size: %zu, s_len: %zu, b_len: %zu, s_end: %zu, "
+           "b_end: %zu, ",
+           rlfm->S.size, rlfm->B.size, rlfm->S.len, rlfm->B.len, rlfm->S.end,
+           rlfm->B.end);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", rlfm->Cs[0], rlfm->Cs[1],
            rlfm->Cs[2], rlfm->Cs[3]);
 }
@@ -233,20 +243,22 @@ void derive_bp(RLFM *rlfm) {
     rlfm->Bp.data = calloc(rlfm->Bp.size, 1);
 
     // '\n' goes at the start
-    rlfm->Bp.data[0] |= 0b10000000;
+    rlfm->Bp.data[0] |= 1;
 
     size_t bp_pos = 1;
     size_t fs_pos = 1;
 
     for (unsigned char code = 0; code < 4; ++code) {
         size_t curr_c_offset = fs_pos;
-        for (; fs_pos < rlfm->Cs[code]; ++fs_pos) {
+        for (; fs_pos <= rlfm->Cs[code]; ++fs_pos) {
+            if (fs_pos == rlfm->S.end) {
+                continue;
+            }
             size_t s_pos = select_s(&rlfm->S, fs_pos - curr_c_offset + 1, code);
             size_t b_pos = select_b(&rlfm->B, s_pos + 1);
-            /* printf("s%zub%zu ", s_pos, b_pos); */
-            rlfm->Bp.data[b_pos / 8] |= 1 << (b_pos % 8);
+            rlfm->Bp.data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
-            size_t b_end = select_b(&rlfm->B, s_pos + 1);
+            size_t b_end = select_b(&rlfm->B, s_pos + 2);
             bp_pos += b_end - b_pos;
         }
     }
