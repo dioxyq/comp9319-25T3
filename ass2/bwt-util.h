@@ -54,6 +54,7 @@ unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);
 RLFM *init_rlfm(size_t file_size);
 void read_bs(RLFM *rlfm, FILE *file, size_t file_size);
 void derive_bp(RLFM *rlfm);
+// closes file
 RLFM *read_rlfm(FILE *file);
 void print_rlfm_s(Index *s);
 void print_rlfm_b(Index *b);

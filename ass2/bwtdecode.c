@@ -31,7 +31,6 @@ int main(int argc, char *argv[]) {
         printf("input file not found\n");
         return 1;
     }
-
     RLFM *rlfm = read_rlfm(input_file);
 
     FILE *output_file = fopen(argv[2], "w");
