@@ -263,19 +263,18 @@ void derive_bp(RLFM *rlfm) {
             bp_pos += b_end - b_pos;
         }
     }
-    printf("\n");
 }
 
 void decode_out(RLFM *rlfm, FILE *file) {
     size_t i = rlfm->B.end;
     unsigned char c_code = 4;
     size_t cs_c = 1;
-    fputc(ENCODING[c_code], file);
-    int start = 1;
 
-    while (i != rlfm->B.end || start) {
-        start = 0;
-        printf("%zu %c\n", i, ENCODING[c_code]);
+    for (size_t file_pos = rlfm->B.len - 1;
+         (file_pos >= 0 && file_pos < 0UL - 1); --file_pos) {
+        fseek(file, file_pos, SEEK_SET);
+        fputc(ENCODING[c_code], file);
+
         i = select_b(&rlfm->Bp,
                      cs_c + rank_s(&rlfm->S, rank_b(&rlfm->B, i), c_code)) +
             i - select_b(&rlfm->B, rank_b(&rlfm->B, i));
@@ -285,9 +284,7 @@ void decode_out(RLFM *rlfm, FILE *file) {
             ((0b11 << (2 * (code_pos % 4))) & (rlfm->S.data[code_pos / 4])) >>
             (2 * (code_pos % 4));
 
-        cs_c = rlfm->Cs[c_code] - rlfm->Cs[0] + 1;
-
-        fputc(ENCODING[c_code], file);
+        cs_c = c_code == 0 ? 1 : rlfm->Cs[c_code - 1];
     }
 }
 
@@ -317,10 +314,10 @@ int main(int argc, char *argv[]) {
     decode_out(rlfm, output_file);
     fclose(output_file);
 
-    print_rlfm(rlfm);
-    print_rlfm_s(&rlfm->S);
-    print_rlfm_b(&rlfm->B);
-    print_rlfm_b(&rlfm->Bp);
+    /* print_rlfm(rlfm); */
+    /* print_rlfm_s(&rlfm->S); */
+    /* print_rlfm_b(&rlfm->B); */
+    /* print_rlfm_b(&rlfm->Bp); */
 
     free(rlfm->S.data);
     free(rlfm->B.data);
