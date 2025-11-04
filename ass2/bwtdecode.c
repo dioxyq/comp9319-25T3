@@ -1,6 +1,6 @@
 #include "bwt-util.h"
 
-void decode_out(RLFM *rlfm, FILE *file) {
+void decode(RLFM *rlfm, FILE *file) {
     size_t i = rlfm->B.end;
     unsigned char c_code = 4;
     size_t cs_c = 1;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
     RLFM *rlfm = read_rlfm(input_file);
 
     FILE *output_file = fopen(argv[2], "w");
-    decode_out(rlfm, output_file);
+    decode(rlfm, output_file);
     fclose(output_file);
 
     /* print_rlfm(rlfm); */
