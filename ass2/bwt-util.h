@@ -50,7 +50,7 @@ size_t select_s(Index *s, size_t count, unsigned char code);
 size_t rank_b(Index *b, size_t pos);
 // count must be less than total number of 1s
 size_t select_b(Index *b, size_t count);
-size_t code_from_l_pos(RLFM *rlfm, size_t l_pos);
+unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);
 RLFM *init_rlfm(size_t file_size);
 void read_bs(RLFM *rlfm, FILE *file, size_t file_size);
 void derive_bp(RLFM *rlfm);

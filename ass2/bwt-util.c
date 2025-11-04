@@ -88,10 +88,24 @@ size_t select_b(Index *b, size_t count) {
     return pos;
 }
 
-size_t code_from_l_pos(RLFM *rlfm, size_t l_pos) {
+unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
     size_t code_pos = rank_b(&rlfm->B, l_pos) - 1;
     return ((0b11 << (2 * (code_pos % 4))) & (rlfm->S.data[code_pos / 4])) >>
            (2 * (code_pos % 4));
+}
+
+size_t lf_i(RLFM *rlfm, size_t i, unsigned char code) {
+    size_t cs_c = code == 0 ? 1 : rlfm->Cs[code - 1];
+    if (code != code_from_l_pos(rlfm, i)) {
+        return select_b(&rlfm->Bp,
+                        cs_c + 1 +
+                            rank_s(&rlfm->S, rank_b(&rlfm->B, i), code)) -
+               1;
+    } else {
+        return select_b(&rlfm->Bp,
+                        cs_c + rank_s(&rlfm->S, rank_b(&rlfm->B, i), code)) +
+               i - select_b(&rlfm->B, rank_b(&rlfm->B, i));
+    }
 }
 
 RLFM *init_rlfm(size_t file_size) {
