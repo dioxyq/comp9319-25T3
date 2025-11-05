@@ -59,10 +59,10 @@ size_t select_s(Index *s, size_t count, unsigned char code) {
 size_t rank_b(Index *b, size_t pos) {
     size_t count = 0;
     for (size_t i = 0; i < pos / 8; i++) {
-        count += COUNT_ONES[b->data[i]];
+        count += __builtin_popcount(b->data[i]);
     }
     // count remaining bits from pos - 7 to pos
-    count += COUNT_ONES[(0xFF >> (7 - (pos % 8))) & b->data[pos / 8]];
+    count += __builtin_popcount((0xFF >> (7 - (pos % 8))) & b->data[pos / 8]);
     return count;
 }
 
@@ -71,14 +71,14 @@ size_t select_b(Index *b, size_t count) {
     size_t sum = 0;
     size_t i = 0;
     for (; sum < count && i <= b->len / 8; i++) {
-        sum += COUNT_ONES[b->data[i]];
+        sum += __builtin_popcount(b->data[i]);
     }
     --i;
     size_t pos = i * 8;
     //  correctly count overshoot byte
     if (sum >= count) {
         unsigned char byte = b->data[i];
-        sum -= COUNT_ONES[byte];
+        sum -= __builtin_popcount(byte);
         int j = 0;
         for (; sum < count; j++) {
             sum += ((1 << j) & byte) >> j;
