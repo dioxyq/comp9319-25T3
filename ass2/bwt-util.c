@@ -1,14 +1,36 @@
 #include "bwt-util.h"
+#include <string.h>
+
+void free_rank_index(RankIndex *rank_index) {
+    // TODO: fix, causes segfault sometimes?
+    return;
+    if (rank_index == NULL) {
+        return;
+    }
+    if (rank_index->chunk_rank != NULL) {
+        free(rank_index->chunk_rank);
+    }
+    if (rank_index->subchunk_rank != NULL) {
+        free(rank_index->subchunk_rank);
+    }
+    free(rank_index);
+}
 
 void free_rlfm(RLFM *rlfm) {
+    if (rlfm == NULL) {
+        return;
+    }
     if (rlfm->S.data != NULL) {
         free(rlfm->S.data);
+        free_rank_index(rlfm->S.rank_index);
     }
     if (rlfm->B.data != NULL) {
         free(rlfm->B.data);
+        free_rank_index(rlfm->B.rank_index);
     }
     if (rlfm->Bp.data != NULL) {
         free(rlfm->Bp.data);
+        free_rank_index(rlfm->Bp.rank_index);
     }
     free(rlfm);
 }
@@ -66,6 +88,26 @@ size_t rank_b(Index *b, size_t pos) {
     return count;
 }
 
+size_t rank_b_indexed(Index *b, size_t pos) {
+    size_t subchunk_index = pos / RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_index = subchunk_index / b->rank_index->subchunks_per_chunk;
+
+    size_t start = subchunk_index * RANK_SUBCHUNK_SIZE_BITS;
+    size_t count = 0;
+    for (size_t i = start / 8; i < pos / 8; i++) {
+        count += __builtin_popcount(b->data[i]);
+    }
+    // count remaining bits from pos - 7 to pos
+    count += __builtin_popcount((0xFF >> (7 - (pos % 8))) & b->data[pos / 8]);
+
+    size_t relative_rank = b->rank_index->subchunk_rank[subchunk_index];
+    size_t cumulative_rank = b->rank_index->chunk_rank[chunk_index];
+
+    // printf("c: %zu, sc: %zu\n", cumulative_rank, relative_rank);
+
+    return cumulative_rank + relative_rank + count;
+}
+
 // count must be less than s->len
 size_t select_b(Index *b, size_t count) {
     size_t sum = 0;
@@ -92,6 +134,55 @@ unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
     size_t code_pos = rank_b(&rlfm->B, l_pos) - 1;
     return ((0b11 << (2 * (code_pos % 4))) & (rlfm->S.data[code_pos / 4])) >>
            (2 * (code_pos % 4));
+}
+
+void derive_rank_index(Index *index) {
+    size_t n = index->len;
+    double log_n = log2(n);
+    size_t subchunk_count =
+        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t subchunks_per_chunk =
+        ceil(log_n * log_n /
+             (double)RANK_SUBCHUNK_SIZE_BITS); // presume chunk size log^2(n)
+    size_t chunk_size_bits = subchunks_per_chunk * RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_count =
+        (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
+
+    RankIndex *rank_index = malloc(sizeof(RankIndex));
+    rank_index->chunk_rank =
+        calloc(chunk_count, sizeof(rank_index->chunk_rank));
+    rank_index->subchunk_rank =
+        calloc(subchunk_count, sizeof(rank_index->subchunk_rank));
+    rank_index->chunk_count = chunk_count;
+    rank_index->subchunk_count = subchunk_count;
+    rank_index->subchunks_per_chunk = subchunks_per_chunk;
+
+    uint32_t cumulative_rank = 0;
+    for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
+        rank_index->chunk_rank[chunk_index] = cumulative_rank;
+
+        uint32_t relative_rank = 0;
+        for (size_t subchunk_index = 0; subchunk_index < subchunks_per_chunk;
+             ++subchunk_index) {
+            size_t subchunk_offset =
+                chunk_index * subchunks_per_chunk + subchunk_index;
+
+            rank_index->subchunk_rank[subchunk_offset] = relative_rank;
+
+            uint64_t buffer = 0;
+            for (int i = 0; i < RANK_SUBCHUNK_SIZE / sizeof(buffer); ++i) {
+                size_t offset =
+                    subchunk_offset * RANK_SUBCHUNK_SIZE + i * sizeof(buffer);
+
+                memcpy(&buffer, index->data + offset, sizeof(buffer));
+                relative_rank += __builtin_popcountg(buffer);
+            }
+        }
+
+        cumulative_rank += relative_rank;
+    }
+
+    index->rank_index = rank_index;
 }
 
 RLFM *init_rlfm(size_t file_size) {
@@ -217,8 +308,38 @@ RLFM *read_rlfm(FILE *file) {
     fclose(file);
 
     derive_bp(rlfm);
+    derive_rank_index(&rlfm->B);
+
+    /* printf("rank: %zu, ", rank_b(&rlfm->B, 100000)); */
+    /* printf("rank_indexed: %zu\n", rank_b_indexed(&rlfm->B, 100000)); */
+
+    /* print_rlfm(rlfm); */
+    /* print_rlfm_s(&rlfm->S); */
+    /* print_rlfm_b(&rlfm->B); */
+    /* print_rlfm_b(&rlfm->Bp); */
+    /* print_rank_index(rlfm->B.rank_index); */
 
     return rlfm;
+}
+
+void print_rank_index(RankIndex *rank_index) {
+    printf(
+        "chunk_count: %zu, subchunk_count: %zu, subchunks_per_chunk: %zu\n[ ",
+        rank_index->chunk_count, rank_index->subchunk_count,
+        rank_index->subchunks_per_chunk);
+    for (size_t chunk_index = 0; chunk_index < rank_index->chunk_count;
+         ++chunk_index) {
+        printf("%du [ ", rank_index->chunk_rank[chunk_index]);
+        for (size_t subchunk_index = 0;
+             subchunk_index < rank_index->subchunk_count; ++subchunk_index) {
+            size_t subchunk_offset =
+                chunk_index * rank_index->subchunks_per_chunk + subchunk_index;
+
+            printf("%du, ", rank_index->subchunk_rank[subchunk_offset]);
+        }
+        printf("], ");
+    }
+    printf("]\n");
 }
 
 void print_rlfm_s(Index *s) {
