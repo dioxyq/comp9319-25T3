@@ -33,11 +33,20 @@ typedef struct {
     size_t end;
 } Index;
 
+typedef struct {
+    unsigned char *data;
+    size_t size;
+    size_t len;
+    size_t end;
+} SIndex;
+
 static const Index NEW_INDEX = {
     .data = NULL, .rank_index = NULL, .size = 0, .len = 0, .end = 0};
 
+static const SIndex NEW_SINDEX = {.data = NULL, .size = 0, .len = 0, .end = 0};
+
 typedef struct {
-    Index S;
+    SIndex S;
     Index B;
     Index Bp;
     unsigned int Cs[4];
@@ -46,21 +55,23 @@ typedef struct {
 void free_rank_index(RankIndex *jacobson_rank);
 void free_rlfm(RLFM *rlfm);
 // pos must be in bounds
-size_t rank_s(Index *s, size_t pos, unsigned char code);
+size_t rank_s(SIndex *s, size_t pos, unsigned char code);
 // count must be less than total number of code
-size_t select_s(Index *s, size_t count, unsigned char code);
+size_t select_s(SIndex *s, size_t count, unsigned char code);
 // pos must be in bounds
 size_t rank_b(Index *b, size_t pos);
+size_t rank_b_indexed(Index *b, size_t pos);
 // count must be less than total number of 1s
 size_t select_b(Index *b, size_t count);
+size_t select_b_indexed(Index *b, size_t count);
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);
-void derive_index_rank(Index *index);
+void derive_rank_index(Index *index);
 RLFM *init_rlfm(size_t file_size);
 void read_bs(RLFM *rlfm, FILE *file, size_t file_size);
 void derive_bp(RLFM *rlfm);
 // closes file
 RLFM *read_rlfm(FILE *file);
 void print_rank_index(RankIndex *rank_index);
-void print_rlfm_s(Index *s);
+void print_rlfm_s(SIndex *s);
 void print_rlfm_b(Index *b);
 void print_rlfm(RLFM *rlfm);

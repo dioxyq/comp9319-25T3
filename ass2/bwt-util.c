@@ -22,7 +22,6 @@ void free_rlfm(RLFM *rlfm) {
     }
     if (rlfm->S.data != NULL) {
         free(rlfm->S.data);
-        free_rank_index(rlfm->S.rank_index);
     }
     if (rlfm->B.data != NULL) {
         free(rlfm->B.data);
@@ -36,7 +35,7 @@ void free_rlfm(RLFM *rlfm) {
 }
 
 // pos must be in bounds
-size_t rank_s(Index *s, size_t pos, unsigned char code) {
+size_t rank_s(SIndex *s, size_t pos, unsigned char code) {
     size_t count = 0;
     for (size_t i = 0; i < pos / 4; ++i) {
         unsigned char byte = s->data[i];
@@ -54,7 +53,7 @@ size_t rank_s(Index *s, size_t pos, unsigned char code) {
 }
 
 // count must be less than s->len
-size_t select_s(Index *s, size_t count, unsigned char code) {
+size_t select_s(SIndex *s, size_t count, unsigned char code) {
     size_t sum = 0;
     size_t i = 0;
     int j = 0;
@@ -103,8 +102,6 @@ size_t rank_b_indexed(Index *b, size_t pos) {
     size_t relative_rank = b->rank_index->subchunk_rank[subchunk_index];
     size_t cumulative_rank = b->rank_index->chunk_rank[chunk_index];
 
-    // printf("c: %zu, sc: %zu\n", cumulative_rank, relative_rank);
-
     return cumulative_rank + relative_rank + count;
 }
 
@@ -128,6 +125,31 @@ size_t select_b(Index *b, size_t count) {
         pos += j - 1;
     }
     return pos;
+}
+
+size_t select_b_indexed(Index *b, size_t count) {
+    // binary search on rank index
+    const double COUNT_TO_POS_HEURISTIC = 1.5;
+    const double SEARCH_WINDOW_HEURISTIC = 0.2;
+    size_t search_window_size = b->len * SEARCH_WINDOW_HEURISTIC;
+    size_t pos = count * COUNT_TO_POS_HEURISTIC;
+    size_t low = max(0, pos - search_window_size / 2);
+    size_t high = min(b->len - 1, pos + search_window_size / 2);
+    while (low < high) {
+        pos = low + (high - low) / 2;
+
+        size_t rank_at_pos = rank_b_indexed(b, pos);
+
+        if (rank_at_pos == count) {
+            return pos;
+        }
+
+        if (rank_at_pos < count) {
+            low = pos + 1;
+        } else {
+            high = pos - 1;
+        }
+    }
 }
 
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
@@ -192,7 +214,7 @@ RLFM *init_rlfm(size_t file_size) {
 
     RLFM *rlfm = malloc(sizeof(RLFM));
 
-    rlfm->S = NEW_INDEX;
+    rlfm->S = NEW_SINDEX;
     rlfm->S.data = calloc(s_size, 1);
     rlfm->B = NEW_INDEX;
     rlfm->B.data = calloc(b_size, 1);
@@ -308,10 +330,14 @@ RLFM *read_rlfm(FILE *file) {
     fclose(file);
 
     derive_bp(rlfm);
+
     derive_rank_index(&rlfm->B);
+    /* derive_rank_index(&rlfm->Bp); */
 
     /* printf("rank: %zu, ", rank_b(&rlfm->B, 100000)); */
     /* printf("rank_indexed: %zu\n", rank_b_indexed(&rlfm->B, 100000)); */
+    /* printf("select: %zu, ", select_b(&rlfm->B, 100000)); */
+    /* printf("select_indexed: %zu\n", select_b_indexed(&rlfm->B, 100000)); */
 
     /* print_rlfm(rlfm); */
     /* print_rlfm_s(&rlfm->S); */
@@ -342,7 +368,7 @@ void print_rank_index(RankIndex *rank_index) {
     printf("]\n");
 }
 
-void print_rlfm_s(Index *s) {
+void print_rlfm_s(SIndex *s) {
     for (size_t i = 0; i < (s->len + 3) / 4; ++i) {
         char byte = s->data[i];
         char buf[5] = {'\0'};
