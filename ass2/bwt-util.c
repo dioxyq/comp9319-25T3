@@ -267,7 +267,7 @@ size_t select_b_indexed(Index *b, size_t count) {
 }
 
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
-    size_t code_pos = rank_b(rlfm->B, l_pos) - 1;
+    size_t code_pos = rank_b_indexed(rlfm->B, l_pos) - 1;
     return ((0b11 << (2 * (code_pos % 4))) & (rlfm->S->data[code_pos / 4])) >>
            (2 * (code_pos % 4));
 }
