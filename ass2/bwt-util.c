@@ -186,19 +186,6 @@ unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
            (2 * (code_pos % 4));
 }
 
-RankIndex *init_rank_index(size_t chunk_count, size_t subchunk_count) {
-    RankIndex *rank_index = malloc(sizeof(RankIndex));
-    rank_index->chunk_rank =
-        calloc(chunk_count, sizeof(rank_index->chunk_rank));
-    rank_index->subchunk_rank =
-        calloc(subchunk_count, sizeof(rank_index->subchunk_rank));
-    rank_index->chunk_count = chunk_count;
-    rank_index->subchunk_count = subchunk_count;
-    rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
-
-    return rank_index;
-}
-
 void derive_rank_index(Index *index) {
     size_t n = index->len;
     size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
@@ -207,7 +194,14 @@ void derive_rank_index(Index *index) {
     size_t chunk_count =
         (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
 
-    RankIndex *rank_index = init_rank_index(chunk_count, subchunk_count);
+    RankIndex *rank_index = malloc(sizeof(RankIndex));
+    rank_index->chunk_rank =
+        calloc(chunk_count, sizeof(rank_index->chunk_rank));
+    rank_index->subchunk_rank =
+        calloc(subchunk_count, sizeof(rank_index->subchunk_rank));
+    rank_index->chunk_count = chunk_count;
+    rank_index->subchunk_count = subchunk_count;
+    rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
 
     uint32_t cumulative_rank = 0;
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
@@ -240,8 +234,67 @@ void derive_rank_index(Index *index) {
     index->rank_index = rank_index;
 }
 
-void derive_s_rank_index(SIndex *index, unsigned int Cs[4]) {
-    // TODO:
+void derive_s_rank_index(SIndex *index) {
+    size_t n = index->len;
+    size_t subchunk_count =
+        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_count =
+        (n + RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS - 1) /
+        (RANK_SUBCHUNKS_PER_CHUNK *
+         RANK_SUBCHUNK_SIZE_BITS); // divceil n / chunk_size
+
+    SRankIndex *rank_index = malloc(sizeof(SRankIndex));
+    rank_index->chunk_rank = calloc(chunk_count, sizeof(uint32_t[4]));
+    rank_index->subchunk_rank = calloc(subchunk_count, sizeof(uint16_t[4]));
+    rank_index->chunk_count = chunk_count;
+    rank_index->subchunk_count = subchunk_count;
+    rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
+
+    uint32_t cumulative_rank[4] = {0};
+    for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
+        rank_index->chunk_rank[chunk_index][0] = cumulative_rank[0];
+        rank_index->chunk_rank[chunk_index][1] = cumulative_rank[1];
+        rank_index->chunk_rank[chunk_index][2] = cumulative_rank[2];
+        rank_index->chunk_rank[chunk_index][3] = cumulative_rank[3];
+
+        uint32_t relative_rank[4] = {0};
+        for (size_t subchunk_index = 0;
+             subchunk_index <
+             (chunk_index != chunk_count - 1
+                  ? RANK_SUBCHUNKS_PER_CHUNK
+                  : (subchunk_count - 1) % RANK_SUBCHUNKS_PER_CHUNK) +
+                 1;
+             ++subchunk_index) {
+            size_t subchunk_offset =
+                chunk_index * RANK_SUBCHUNKS_PER_CHUNK + subchunk_index;
+
+            /* printf("chunk: %zu, subchunk: %zu\n", chunk_index,
+             * subchunk_offset); */
+
+            rank_index->subchunk_rank[subchunk_offset][0] = relative_rank[0];
+            rank_index->subchunk_rank[subchunk_offset][1] = relative_rank[1];
+            rank_index->subchunk_rank[subchunk_offset][2] = relative_rank[2];
+            rank_index->subchunk_rank[subchunk_offset][3] = relative_rank[3];
+
+            for (int i = 0; i < 16 * RANK_SUBCHUNK_SIZE / 8; ++i) {
+                size_t offset =
+                    16 * subchunk_offset * RANK_SUBCHUNK_SIZE / 8 + i;
+                /* printf("offset: %zu\n", offset); */
+                unsigned char byte = index->data[offset];
+                for (int j = 0; j < 8; j += 2) {
+                    unsigned char code = (byte & (0b11 << j)) >> j;
+                    ++relative_rank[code];
+                }
+            }
+        }
+
+        cumulative_rank[0] += relative_rank[0];
+        cumulative_rank[1] += relative_rank[1];
+        cumulative_rank[2] += relative_rank[2];
+        cumulative_rank[3] += relative_rank[3];
+    }
+
+    index->rank_index = rank_index;
 }
 
 RLFM *init_rlfm(size_t file_size) {
@@ -384,11 +437,13 @@ RLFM *read_rlfm(FILE *file) {
     read_bs(rlfm, file, file_size);
     fclose(file);
 
+    derive_s_rank_index(rlfm->S);
+
     derive_rank_index(rlfm->B);
 
-    derive_bp(rlfm);
+    /* derive_bp(rlfm); */
 
-    derive_rank_index(rlfm->Bp);
+    /* derive_rank_index(rlfm->Bp); */
 
     // printf("rank: %zu, rank_indexed: %zu\n", rank_b(rlfm->B, 100000),
     //        rank_b_indexed(rlfm->B, 100000));

@@ -34,9 +34,9 @@ int main(int argc, char *argv[]) {
     }
     RLFM *rlfm = read_rlfm(input_file);
 
-    FILE *output_file = fopen(argv[2], "w");
-    decode(rlfm, output_file);
-    fclose(output_file);
+    /* FILE *output_file = fopen(argv[2], "w"); */
+    /* decode(rlfm, output_file); */
+    /* fclose(output_file); */
 
     /* print_rlfm(rlfm); */
     /* print_rlfm_s(&rlfm->S); */
