@@ -186,14 +186,7 @@ unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
            (2 * (code_pos % 4));
 }
 
-void derive_rank_index(Index *index) {
-    size_t n = index->len;
-    size_t subchunk_count =
-        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
-    size_t chunk_count =
-        (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
-
+RankIndex *init_rank_index(size_t chunk_count, size_t subchunk_count) {
     RankIndex *rank_index = malloc(sizeof(RankIndex));
     rank_index->chunk_rank =
         calloc(chunk_count, sizeof(rank_index->chunk_rank));
@@ -202,6 +195,19 @@ void derive_rank_index(Index *index) {
     rank_index->chunk_count = chunk_count;
     rank_index->subchunk_count = subchunk_count;
     rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
+
+    return rank_index;
+}
+
+void derive_rank_index(Index *index) {
+    size_t n = index->len;
+    size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
+    size_t subchunk_count =
+        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_count =
+        (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
+
+    RankIndex *rank_index = init_rank_index(chunk_count, subchunk_count);
 
     uint32_t cumulative_rank = 0;
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
@@ -234,7 +240,37 @@ void derive_rank_index(Index *index) {
     index->rank_index = rank_index;
 }
 
-void derive_wavelet_rank_index(SIndex *index) {}
+void derive_wavelet_rank_index(SIndex *index, unsigned int Cs[4]) {
+    // left is A(00), C(01)
+    // right is G(10), T(11)
+    size_t n = index->len;
+    size_t left_n = Cs[1];
+    size_t right_n = Cs[3] - Cs[1];
+    size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
+    size_t root_subchunk_count =
+        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t left_subchunk_count =
+        (left_n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t right_subchunk_count =
+        (right_n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
+    size_t root_chunk_count = (n + chunk_size_bits - 1) / chunk_size_bits;
+    size_t left_chunk_count = (left_n + chunk_size_bits - 1) / chunk_size_bits;
+    size_t right_chunk_count =
+        (right_n + chunk_size_bits - 1) / chunk_size_bits;
+
+    RankIndex *root_rank_index =
+        init_rank_index(root_chunk_count, root_subchunk_count);
+    RankIndex *left_rank_index =
+        init_rank_index(left_chunk_count, left_subchunk_count);
+    RankIndex *right_rank_index =
+        init_rank_index(right_chunk_count, right_subchunk_count);
+
+    // TODO:
+
+    index->rank_index->root = root_rank_index;
+    index->rank_index->left = left_rank_index;
+    index->rank_index->right = right_rank_index;
+}
 
 RLFM *init_rlfm(size_t file_size) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
