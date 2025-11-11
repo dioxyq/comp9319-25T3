@@ -4,14 +4,16 @@
 size_t lf_i(RLFM *rlfm, size_t i, unsigned char code, int is_lst) {
     size_t cs_c = code == 0 ? 1 : rlfm->Cs[code - 1];
     if (code != code_from_l_pos(rlfm, i)) {
-        return select_b(&rlfm->Bp,
-                        cs_c + 1 +
-                            rank_s(&rlfm->S, rank_b(&rlfm->B, i), code)) -
+        return select_b_indexed(
+                   rlfm->Bp,
+                   cs_c + 1 +
+                       rank_s(rlfm->S, rank_b_indexed(rlfm->B, i), code)) -
                1;
     } else {
-        return select_b(&rlfm->Bp,
-                        cs_c + rank_s(&rlfm->S, rank_b(&rlfm->B, i), code)) +
-               i - select_b(&rlfm->B, rank_b(&rlfm->B, i));
+        return select_b_indexed(
+                   rlfm->Bp,
+                   cs_c + rank_s(rlfm->S, rank_b_indexed(rlfm->B, i), code)) +
+               i - select_b_indexed(rlfm->B, rank_b_indexed(rlfm->B, i));
     }
 }
 
@@ -19,8 +21,9 @@ size_t search(RLFM *rlfm, FILE *file, char *search_term, size_t len) {
     char c = search_term[len - 1];
     unsigned char code =
         (c == ENCODING[1]) + 2 * (c == ENCODING[2]) + 3 * (c == ENCODING[3]);
-    size_t fst = select_b(&rlfm->Bp, (code == 0 ? 1 : rlfm->Cs[code - 1]) + 1);
-    size_t lst = select_b(&rlfm->Bp, rlfm->Cs[code] + 1) - 1;
+    size_t fst =
+        select_b_indexed(rlfm->Bp, (code == 0 ? 1 : rlfm->Cs[code - 1]) + 1);
+    size_t lst = select_b_indexed(rlfm->Bp, rlfm->Cs[code] + 1) - 1;
 
     for (int i = len - 2; i >= 0; --i) {
         c = search_term[i];
@@ -62,9 +65,9 @@ int main(int argc, char *argv[]) {
     }
 
     print_rlfm(rlfm);
-    print_rlfm_s(&rlfm->S);
-    print_rlfm_b(&rlfm->B);
-    print_rlfm_b(&rlfm->Bp);
+    print_rlfm_s(rlfm->S);
+    print_rlfm_b(rlfm->B);
+    print_rlfm_b(rlfm->Bp);
 
     free(line);
     free_rlfm(rlfm);

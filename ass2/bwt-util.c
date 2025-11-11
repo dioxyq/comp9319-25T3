@@ -20,16 +20,16 @@ void free_rlfm(RLFM *rlfm) {
     if (rlfm == NULL) {
         return;
     }
-    if (rlfm->S.data != NULL) {
-        free(rlfm->S.data);
+    if (rlfm->S->data != NULL) {
+        free(rlfm->S->data);
     }
-    if (rlfm->B.data != NULL) {
-        free(rlfm->B.data);
-        free_rank_index(rlfm->B.rank_index);
+    if (rlfm->B->data != NULL) {
+        free(rlfm->B->data);
+        free_rank_index(rlfm->B->rank_index);
     }
-    if (rlfm->Bp.data != NULL) {
-        free(rlfm->Bp.data);
-        free_rank_index(rlfm->Bp.rank_index);
+    if (rlfm->Bp->data != NULL) {
+        free(rlfm->Bp->data);
+        free_rank_index(rlfm->Bp->rank_index);
     }
     free(rlfm);
 }
@@ -181,8 +181,8 @@ size_t select_b_indexed(Index *b, size_t count) {
 }
 
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
-    size_t code_pos = rank_b(&rlfm->B, l_pos) - 1;
-    return ((0b11 << (2 * (code_pos % 4))) & (rlfm->S.data[code_pos / 4])) >>
+    size_t code_pos = rank_b(rlfm->B, l_pos) - 1;
+    return ((0b11 << (2 * (code_pos % 4))) & (rlfm->S->data[code_pos / 4])) >>
            (2 * (code_pos % 4));
 }
 
@@ -240,36 +240,8 @@ void derive_rank_index(Index *index) {
     index->rank_index = rank_index;
 }
 
-void derive_wavelet_rank_index(SIndex *index, unsigned int Cs[4]) {
-    // left is A(00), C(01)
-    // right is G(10), T(11)
-    size_t n = index->len;
-    size_t left_n = Cs[1];
-    size_t right_n = Cs[3] - Cs[1];
-    size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
-    size_t root_subchunk_count =
-        (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t left_subchunk_count =
-        (left_n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t right_subchunk_count =
-        (right_n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t root_chunk_count = (n + chunk_size_bits - 1) / chunk_size_bits;
-    size_t left_chunk_count = (left_n + chunk_size_bits - 1) / chunk_size_bits;
-    size_t right_chunk_count =
-        (right_n + chunk_size_bits - 1) / chunk_size_bits;
-
-    RankIndex *root_rank_index =
-        init_rank_index(root_chunk_count, root_subchunk_count);
-    RankIndex *left_rank_index =
-        init_rank_index(left_chunk_count, left_subchunk_count);
-    RankIndex *right_rank_index =
-        init_rank_index(right_chunk_count, right_subchunk_count);
-
+void derive_s_rank_index(SIndex *index, unsigned int Cs[4]) {
     // TODO:
-
-    index->rank_index->root = root_rank_index;
-    index->rank_index->left = left_rank_index;
-    index->rank_index->right = right_rank_index;
 }
 
 RLFM *init_rlfm(size_t file_size) {
@@ -279,11 +251,27 @@ RLFM *init_rlfm(size_t file_size) {
 
     RLFM *rlfm = malloc(sizeof(RLFM));
 
-    rlfm->S = NEW_SINDEX;
-    rlfm->S.data = calloc(s_size, 1);
-    rlfm->B = NEW_INDEX;
-    rlfm->B.data = calloc(b_size, 1);
-    rlfm->Bp = NEW_INDEX;
+    rlfm->S = malloc(sizeof(SIndex));
+    rlfm->S->data = calloc(s_size, 1);
+    rlfm->S->rank_index = NULL;
+    rlfm->S->size = 0;
+    rlfm->S->len = 0;
+    rlfm->S->end = 0;
+
+    rlfm->B = malloc(sizeof(Index));
+    rlfm->B->data = calloc(b_size, 1);
+    rlfm->B->rank_index = NULL;
+    rlfm->B->size = 0;
+    rlfm->B->len = 0;
+    rlfm->B->end = 0;
+
+    rlfm->Bp = malloc(sizeof(Index));
+    rlfm->Bp->data = NULL;
+    rlfm->Bp->rank_index = NULL;
+    rlfm->Bp->size = 0;
+    rlfm->Bp->len = 0;
+    rlfm->Bp->end = 0;
+
     rlfm->Cs[0] = 0;
     rlfm->Cs[1] = 0;
     rlfm->Cs[2] = 0;
@@ -314,19 +302,19 @@ void read_bs(RLFM *rlfm, FILE *file, size_t file_size) {
 
                 // branch predictor should effectively ignore this
                 if (code == 4) {
-                    rlfm->S.end = s_offset * 4 + s_bit_offset / 2;
-                    rlfm->B.end = b_offset * 8 + b_bit_offset;
+                    rlfm->S->end = s_offset * 4 + s_bit_offset / 2;
+                    rlfm->B->end = b_offset * 8 + b_bit_offset;
                     code = 0;
                 }
 
                 rlfm->Cs[code] += 1;
 
-                rlfm->S.data[s_offset] |= code << s_bit_offset;
+                rlfm->S->data[s_offset] |= code << s_bit_offset;
                 // branchlessly update s offsets
                 s_offset += (s_bit_offset == 6);
                 s_bit_offset = (s_bit_offset + 2) * (s_bit_offset < 6);
 
-                rlfm->B.data[b_offset] |= 1 << b_bit_offset;
+                rlfm->B->data[b_offset] |= 1 << b_bit_offset;
                 // branchlessly update b offsets for 1
                 b_offset += (b_bit_offset == 7);
                 b_bit_offset = (b_bit_offset + 1) * (b_bit_offset < 7);
@@ -346,25 +334,25 @@ void read_bs(RLFM *rlfm, FILE *file, size_t file_size) {
     rlfm->Cs[2] += rlfm->Cs[1];
     rlfm->Cs[3] += rlfm->Cs[2];
 
-    rlfm->S.size = s_offset + (s_bit_offset != 0);
-    rlfm->B.size = b_offset + (b_bit_offset != 0);
-    rlfm->S.len = s_offset * 4 + s_bit_offset / 2;
-    rlfm->B.len = b_offset * 8 + b_bit_offset;
+    rlfm->S->size = s_offset + (s_bit_offset != 0);
+    rlfm->B->size = b_offset + (b_bit_offset != 0);
+    rlfm->S->len = s_offset * 4 + s_bit_offset / 2;
+    rlfm->B->len = b_offset * 8 + b_bit_offset;
 
-    rlfm->S.data = realloc(rlfm->S.data, rlfm->S.size);
-    rlfm->B.data = realloc(rlfm->B.data, rlfm->B.size);
+    rlfm->S->data = realloc(rlfm->S->data, rlfm->S->size);
+    rlfm->B->data = realloc(rlfm->B->data, rlfm->B->size);
 
     free(buf);
 }
 
 void derive_bp(RLFM *rlfm) {
-    rlfm->Bp.size = rlfm->B.size;
-    rlfm->Bp.len = rlfm->B.len;
-    rlfm->Bp.end = 0;
-    rlfm->Bp.data = calloc(rlfm->Bp.size, 1);
+    rlfm->Bp->size = rlfm->B->size;
+    rlfm->Bp->len = rlfm->B->len;
+    rlfm->Bp->end = 0;
+    rlfm->Bp->data = calloc(rlfm->Bp->size, 1);
 
     // '\n' goes at the start
-    rlfm->Bp.data[0] |= 1;
+    rlfm->Bp->data[0] |= 1;
 
     size_t bp_pos = 1;
     size_t fs_pos = 1;
@@ -372,14 +360,16 @@ void derive_bp(RLFM *rlfm) {
     for (unsigned char code = 0; code < 4; ++code) {
         size_t curr_c_offset = fs_pos;
         for (; fs_pos <= rlfm->Cs[code]; ++fs_pos) {
-            if (fs_pos == rlfm->S.end) {
+            if (fs_pos == rlfm->S->end) {
                 continue;
             }
-            size_t s_pos = select_s(&rlfm->S, fs_pos - curr_c_offset + 1, code);
-            size_t b_pos = select_b(&rlfm->B, s_pos + 1);
-            rlfm->Bp.data[bp_pos / 8] |= 1 << (bp_pos % 8);
+            size_t s_pos = select_s(rlfm->S, fs_pos - curr_c_offset + 1, code);
+            size_t b_pos = select_b_indexed(rlfm->B, s_pos + 1);
+            rlfm->Bp->data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
-            size_t b_end = select_b(&rlfm->B, s_pos + 2);
+            size_t b_end = s_pos + 1 < rlfm->S->len
+                               ? select_b_indexed(rlfm->B, s_pos + 2)
+                               : rlfm->B->len;
             bp_pos += b_end - b_pos;
         }
     }
@@ -394,22 +384,22 @@ RLFM *read_rlfm(FILE *file) {
     read_bs(rlfm, file, file_size);
     fclose(file);
 
-    derive_rank_index(&rlfm->B);
+    derive_rank_index(rlfm->B);
 
-    /* derive_bp(rlfm); */
+    derive_bp(rlfm);
 
-    /* derive_rank_index(&rlfm->Bp); */
+    derive_rank_index(rlfm->Bp);
 
-    printf("rank: %zu, rank_indexed: %zu\n", rank_b(&rlfm->B, 100000),
-           rank_b_indexed(&rlfm->B, 100000));
-    printf("select: %zu, select_indexed: %zu\n", select_b(&rlfm->B, 100000),
-           select_b_indexed(&rlfm->B, 100000));
+    // printf("rank: %zu, rank_indexed: %zu\n", rank_b(rlfm->B, 100000),
+    //        rank_b_indexed(rlfm->B, 100000));
+    // printf("select: %zu, select_indexed: %zu\n", select_b(rlfm->B, 100000),
+    //        select_b_indexed(rlfm->B, 100000));
 
     /* print_rlfm(rlfm); */
-    /* print_rlfm_s(&rlfm->S); */
-    /* print_rlfm_b(&rlfm->B); */
-    /* print_rlfm_b(&rlfm->Bp); */
-    /* print_rank_index(rlfm->B.rank_index); */
+    /* print_rlfm_s(rlfm->S); */
+    /* print_rlfm_b(rlfm->B); */
+    /* print_rlfm_b(rlfm->Bp); */
+    /* print_rank_index(rlfm->B->rank_index); */
 
     return rlfm;
 }
@@ -464,8 +454,8 @@ void print_rlfm_b(Index *b) {
 void print_rlfm(RLFM *rlfm) {
     printf("s_size: %zu, b_size: %zu, s_len: %zu, b_len: %zu, s_end: %zu, "
            "b_end: %zu, ",
-           rlfm->S.size, rlfm->B.size, rlfm->S.len, rlfm->B.len, rlfm->S.end,
-           rlfm->B.end);
+           rlfm->S->size, rlfm->B->size, rlfm->S->len, rlfm->B->len,
+           rlfm->S->end, rlfm->B->end);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", rlfm->Cs[0], rlfm->Cs[1],
            rlfm->Cs[2], rlfm->Cs[3]);
 }

@@ -35,16 +35,16 @@ typedef struct {
 } Index;
 
 typedef struct {
-    RankIndex *root;
-    RankIndex *left;
-    RankIndex *right;
-} WaveletRankIndex; // Jacboson's rank based on wavelet tree
-                    // (although S is contiguous 2-bit codes)
-                    // root is left if 0 or 2, right if 1 or 3
+    uint32_t (*chunk_rank)[4];
+    uint16_t (*subchunk_rank)[4];
+    size_t chunk_count;
+    size_t subchunk_count;
+    size_t subchunks_per_chunk;
+} SRankIndex;
 
 typedef struct {
     unsigned char *data;
-    WaveletRankIndex *rank_index;
+    SRankIndex *rank_index;
     size_t size;
     size_t len;
     size_t end;
@@ -53,12 +53,13 @@ typedef struct {
 static const Index NEW_INDEX = {
     .data = NULL, .rank_index = NULL, .size = 0, .len = 0, .end = 0};
 
-static const SIndex NEW_SINDEX = {.data = NULL, .size = 0, .len = 0, .end = 0};
+static const SIndex NEW_SINDEX = {
+    .data = NULL, .rank_index = NULL, .size = 0, .len = 0, .end = 0};
 
 typedef struct {
-    SIndex S;
-    Index B;
-    Index Bp;
+    SIndex *S;
+    Index *B;
+    Index *Bp;
     unsigned int Cs[4];
 } RLFM;
 
@@ -77,7 +78,7 @@ size_t select_b_indexed(Index *b, size_t count);
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);
 RankIndex *init_rank_index(size_t chunk_count, size_t subchunk_count);
 void derive_rank_index(Index *index);
-void derive_wavelet_rank_index(SIndex *index, unsigned int Cs[4]);
+void derive_s_rank_index(SIndex *index, unsigned int Cs[4]);
 RLFM *init_rlfm(size_t file_size);
 void read_bs(RLFM *rlfm, FILE *file, size_t file_size);
 void derive_bp(RLFM *rlfm);
