@@ -16,6 +16,7 @@ static const float ST_RATIO_HEURISTIC = 0.25;
 static const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 static const size_t RANK_SUBCHUNK_SIZE_BITS = 256;
 static const size_t RANK_SUBCHUNK_SIZE = 32;
+static const size_t RANK_SUBCHUNKS_PER_CHUNK = 256;
 
 typedef struct {
     uint32_t *chunk_rank;    // n/log(n) < 27 < 32 for n=110x10^6
@@ -34,7 +35,16 @@ typedef struct {
 } Index;
 
 typedef struct {
+    RankIndex *root;
+    RankIndex *left;
+    RankIndex *right;
+} WaveletRankIndex; // Jacboson's rank based on wavelet tree
+                    // (although S is contiguous 2-bit codes)
+                    // root is left if 0 or 2, right if 1 or 3
+
+typedef struct {
     unsigned char *data;
+    WaveletRankIndex *rank_index;
     size_t size;
     size_t len;
     size_t end;
@@ -66,6 +76,7 @@ size_t select_b(Index *b, size_t count);
 size_t select_b_indexed(Index *b, size_t count);
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);
 void derive_rank_index(Index *index);
+void derive_wavelet_rank_index(SIndex *index);
 RLFM *init_rlfm(size_t file_size);
 void read_bs(RLFM *rlfm, FILE *file, size_t file_size);
 void derive_bp(RLFM *rlfm);

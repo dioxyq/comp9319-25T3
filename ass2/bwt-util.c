@@ -128,28 +128,56 @@ size_t select_b(Index *b, size_t count) {
 }
 
 size_t select_b_indexed(Index *b, size_t count) {
-    // binary search on rank index
+    // binary search on rank index subchunks
     const double COUNT_TO_POS_HEURISTIC = 1.5;
     const double SEARCH_WINDOW_HEURISTIC = 0.2;
-    size_t search_window_size = b->len * SEARCH_WINDOW_HEURISTIC;
-    size_t pos = count * COUNT_TO_POS_HEURISTIC;
-    size_t low = max(0, pos - search_window_size / 2);
-    size_t high = min(b->len - 1, pos + search_window_size / 2);
-    while (low < high) {
-        pos = low + (high - low) / 2;
 
-        size_t rank_at_pos = rank_b_indexed(b, pos);
+    size_t search_window_size =
+        b->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
+    size_t start_index =
+        count * COUNT_TO_POS_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
+    size_t low = search_window_size > start_index
+                     ? 0
+                     : start_index - search_window_size / 2;
+    size_t high = min(b->rank_index->subchunk_count - 1,
+                      start_index + search_window_size / 2);
+    size_t pos = low;
+    size_t rank =
+        b->rank_index->subchunk_rank[low] +
+        b->rank_index->chunk_rank[low / b->rank_index->subchunks_per_chunk];
 
-        if (rank_at_pos == count) {
-            return pos;
+    while (low <= high) {
+        size_t mid = low + (high - low) / 2;
+        size_t mid_rank =
+            b->rank_index->subchunk_rank[mid] +
+            b->rank_index->chunk_rank[mid / b->rank_index->subchunks_per_chunk];
+
+        if (mid_rank < count && mid_rank > rank) {
+            pos = mid;
+            rank = mid_rank;
         }
 
-        if (rank_at_pos < count) {
-            low = pos + 1;
+        if (mid_rank <= count) {
+            low = mid + 1;
         } else {
-            high = pos - 1;
+            high = mid - 1;
         }
     }
+
+    size_t subchunk_count = 0;
+    size_t i = pos * RANK_SUBCHUNK_SIZE_BITS / 8;
+    for (; rank + subchunk_count < count; ++i) {
+        subchunk_count += __builtin_popcount(b->data[i]);
+    }
+    --i;
+    subchunk_count -= __builtin_popcount(b->data[i]);
+    size_t j = 0;
+    for (; rank + subchunk_count < count; ++j) {
+        subchunk_count += ((b->data[i]) & (1 << j)) >> j;
+    }
+    --j;
+
+    return i * 8 + j;
 }
 
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
@@ -163,9 +191,9 @@ void derive_rank_index(Index *index) {
     double log_n = log2(n);
     size_t subchunk_count =
         (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t subchunks_per_chunk =
-        ceil(log_n * log_n /
-             (double)RANK_SUBCHUNK_SIZE_BITS); // presume chunk size log^2(n)
+    size_t subchunks_per_chunk = 250;
+    // ceil(log_n * log_n /
+    //      (double)RANK_SUBCHUNK_SIZE_BITS); // presume chunk size log^2(n)
     size_t chunk_size_bits = subchunks_per_chunk * RANK_SUBCHUNK_SIZE_BITS;
     size_t chunk_count =
         (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
@@ -206,6 +234,8 @@ void derive_rank_index(Index *index) {
 
     index->rank_index = rank_index;
 }
+
+void derive_wavelet_rank_index(SIndex *index) {}
 
 RLFM *init_rlfm(size_t file_size) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
@@ -329,15 +359,16 @@ RLFM *read_rlfm(FILE *file) {
     read_bs(rlfm, file, file_size);
     fclose(file);
 
-    derive_bp(rlfm);
-
     derive_rank_index(&rlfm->B);
+
+    /* derive_bp(rlfm); */
+
     /* derive_rank_index(&rlfm->Bp); */
 
-    /* printf("rank: %zu, ", rank_b(&rlfm->B, 100000)); */
-    /* printf("rank_indexed: %zu\n", rank_b_indexed(&rlfm->B, 100000)); */
-    /* printf("select: %zu, ", select_b(&rlfm->B, 100000)); */
-    /* printf("select_indexed: %zu\n", select_b_indexed(&rlfm->B, 100000)); */
+    printf("rank: %zu, rank_indexed: %zu\n", rank_b(&rlfm->B, 100000),
+           rank_b_indexed(&rlfm->B, 100000));
+    printf("select: %zu, select_indexed: %zu\n", select_b(&rlfm->B, 100000),
+           select_b_indexed(&rlfm->B, 100000));
 
     /* print_rlfm(rlfm); */
     /* print_rlfm_s(&rlfm->S); */
