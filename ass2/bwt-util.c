@@ -52,10 +52,96 @@ size_t rank_s(SIndex *s, size_t pos, unsigned char code) {
     return count;
 }
 
+size_t rank_s_indexed(SIndex *s, size_t pos, unsigned char code) {
+    size_t subchunk_index = pos / RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_index = subchunk_index / s->rank_index->subchunks_per_chunk;
+
+    size_t start = subchunk_index * RANK_SUBCHUNK_SIZE_BITS;
+    size_t count = 0;
+    for (size_t i = start / 4; i < pos / 4; ++i) {
+        unsigned char byte = s->data[i];
+        for (int j = 0; j < 8; j += 2) {
+            count += code == ((byte & (0b11 << j)) >> j);
+        };
+    }
+    // count remaining codes from pos - 3 to pos
+    unsigned char byte = s->data[pos / 4];
+    for (int i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
+        count += code == ((byte & (0b11 << i)) >> i);
+    };
+    count -= (!code) * (pos >= s->end);
+
+    size_t relative_rank = s->rank_index->subchunk_rank[subchunk_index][code];
+    size_t cumulative_rank = s->rank_index->chunk_rank[chunk_index][code];
+
+    return cumulative_rank + relative_rank + count;
+}
+
 // count must be less than s->len
 size_t select_s(SIndex *s, size_t count, unsigned char code) {
     size_t sum = 0;
     size_t i = 0;
+    int j = 0;
+    int passed_end = 0;
+    for (; sum < count; i++) {
+        unsigned char byte = s->data[i];
+        for (j = 0; j < 8; j += 2) {
+            sum += code == ((byte & (0b11 << j)) >> j);
+            if (sum == count) {
+                // handle edge case for end symbol
+                if (!passed_end && !code && (i * 4 + j / 2) >= s->end) {
+                    --sum;
+                    passed_end = 1;
+                    continue;
+                }
+                break;
+            }
+        };
+    }
+    return (i - 1) * 4 + j / 2;
+}
+
+size_t select_s_indexed(SIndex *s, size_t count, unsigned char code) {
+    // binary search on rank index subchunks
+    const double COUNT_TO_POS_HEURISTIC = 4;
+    const double SEARCH_WINDOW_HEURISTIC = 0.2;
+
+    size_t search_window_size =
+        s->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
+    size_t start_index =
+        count * COUNT_TO_POS_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
+    size_t low = search_window_size > start_index
+                     ? 0
+                     : start_index - search_window_size / 2;
+    size_t high = min(s->rank_index->subchunk_count - 1,
+                      start_index + search_window_size / 2);
+    size_t pos = low;
+    size_t rank =
+        s->rank_index->subchunk_rank[low][code] +
+        s->rank_index
+            ->chunk_rank[low / s->rank_index->subchunks_per_chunk][code];
+
+    while (low <= high) {
+        size_t mid = low + (high - low) / 2;
+        size_t mid_rank =
+            s->rank_index->subchunk_rank[mid][code] +
+            s->rank_index
+                ->chunk_rank[mid / s->rank_index->subchunks_per_chunk][code];
+
+        if (mid_rank < count && mid_rank > rank) {
+            pos = mid;
+            rank = mid_rank;
+        }
+
+        if (mid_rank <= count) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    size_t sum = rank;
+    size_t i = 2 * pos * RANK_SUBCHUNK_SIZE;
     int j = 0;
     int passed_end = 0;
     for (; sum < count; i++) {
@@ -251,35 +337,24 @@ void derive_s_rank_index(SIndex *index) {
     rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
 
     uint32_t cumulative_rank[4] = {0};
+    size_t remaining_subchunks = subchunk_count;
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
-        rank_index->chunk_rank[chunk_index][0] = cumulative_rank[0];
-        rank_index->chunk_rank[chunk_index][1] = cumulative_rank[1];
-        rank_index->chunk_rank[chunk_index][2] = cumulative_rank[2];
-        rank_index->chunk_rank[chunk_index][3] = cumulative_rank[3];
+        memcpy(rank_index->chunk_rank[chunk_index], cumulative_rank,
+               sizeof(uint32_t[4]));
 
-        uint32_t relative_rank[4] = {0};
+        uint16_t relative_rank[4] = {0};
         for (size_t subchunk_index = 0;
              subchunk_index <
-             (chunk_index != chunk_count - 1
-                  ? RANK_SUBCHUNKS_PER_CHUNK
-                  : (subchunk_count - 1) % RANK_SUBCHUNKS_PER_CHUNK) +
-                 1;
+             min(remaining_subchunks, RANK_SUBCHUNKS_PER_CHUNK);
              ++subchunk_index) {
             size_t subchunk_offset =
                 chunk_index * RANK_SUBCHUNKS_PER_CHUNK + subchunk_index;
 
-            /* printf("chunk: %zu, subchunk: %zu\n", chunk_index,
-             * subchunk_offset); */
+            memcpy(rank_index->subchunk_rank[subchunk_offset], relative_rank,
+                   sizeof(uint16_t[4]));
 
-            rank_index->subchunk_rank[subchunk_offset][0] = relative_rank[0];
-            rank_index->subchunk_rank[subchunk_offset][1] = relative_rank[1];
-            rank_index->subchunk_rank[subchunk_offset][2] = relative_rank[2];
-            rank_index->subchunk_rank[subchunk_offset][3] = relative_rank[3];
-
-            for (int i = 0; i < 16 * RANK_SUBCHUNK_SIZE / 8; ++i) {
-                size_t offset =
-                    16 * subchunk_offset * RANK_SUBCHUNK_SIZE / 8 + i;
-                /* printf("offset: %zu\n", offset); */
+            for (int i = 0; i < 2 * RANK_SUBCHUNK_SIZE; ++i) {
+                size_t offset = 2 * subchunk_offset * RANK_SUBCHUNK_SIZE + i;
                 unsigned char byte = index->data[offset];
                 for (int j = 0; j < 8; j += 2) {
                     unsigned char code = (byte & (0b11 << j)) >> j;
@@ -292,6 +367,8 @@ void derive_s_rank_index(SIndex *index) {
         cumulative_rank[1] += relative_rank[1];
         cumulative_rank[2] += relative_rank[2];
         cumulative_rank[3] += relative_rank[3];
+
+        remaining_subchunks -= RANK_SUBCHUNKS_PER_CHUNK;
     }
 
     index->rank_index = rank_index;
@@ -416,7 +493,8 @@ void derive_bp(RLFM *rlfm) {
             if (fs_pos == rlfm->S->end) {
                 continue;
             }
-            size_t s_pos = select_s(rlfm->S, fs_pos - curr_c_offset + 1, code);
+            size_t s_pos =
+                select_s_indexed(rlfm->S, fs_pos - curr_c_offset + 1, code);
             size_t b_pos = select_b_indexed(rlfm->B, s_pos + 1);
             rlfm->Bp->data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
@@ -439,11 +517,27 @@ RLFM *read_rlfm(FILE *file) {
 
     derive_s_rank_index(rlfm->S);
 
+    // size_t pos = 100000;
+    // printf("rank_normal : %zu %zu %zu %zu\nrank_indexed: %zu %zu %zu %zu\n",
+    //        rank_s(rlfm->S, pos, 0), rank_s(rlfm->S, pos, 1),
+    //        rank_s(rlfm->S, pos, 2), rank_s(rlfm->S, pos, 3),
+    //        rank_s_indexed(rlfm->S, pos, 0), rank_s_indexed(rlfm->S, pos, 1),
+    //        rank_s_indexed(rlfm->S, pos, 2), rank_s_indexed(rlfm->S, pos, 3));
+
+    // size_t count = 5000;
+    // printf("rank_normal : %zu %zu %zu %zu\nrank_indexed: %zu %zu %zu %zu\n",
+    //        select_s(rlfm->S, count, 0), select_s(rlfm->S, count, 1),
+    //        select_s(rlfm->S, count, 2), select_s(rlfm->S, count, 3),
+    //        select_s_indexed(rlfm->S, count, 0),
+    //        select_s_indexed(rlfm->S, count, 1),
+    //        select_s_indexed(rlfm->S, count, 2),
+    //        select_s_indexed(rlfm->S, count, 3));
+
     derive_rank_index(rlfm->B);
 
-    /* derive_bp(rlfm); */
+    derive_bp(rlfm);
 
-    /* derive_rank_index(rlfm->Bp); */
+    derive_rank_index(rlfm->Bp);
 
     // printf("rank: %zu, rank_indexed: %zu\n", rank_b(rlfm->B, 100000),
     //        rank_b_indexed(rlfm->B, 100000));

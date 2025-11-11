@@ -4,15 +4,17 @@
 size_t lf_i(RLFM *rlfm, size_t i, unsigned char code, int is_lst) {
     size_t cs_c = code == 0 ? 1 : rlfm->Cs[code - 1];
     if (code != code_from_l_pos(rlfm, i)) {
-        return select_b_indexed(
-                   rlfm->Bp,
-                   cs_c + 1 +
-                       rank_s(rlfm->S, rank_b_indexed(rlfm->B, i), code)) -
+        return select_b_indexed(rlfm->Bp,
+                                cs_c + 1 +
+                                    rank_s_indexed(rlfm->S,
+                                                   rank_b_indexed(rlfm->B, i),
+                                                   code)) -
                1;
     } else {
         return select_b_indexed(
                    rlfm->Bp,
-                   cs_c + rank_s(rlfm->S, rank_b_indexed(rlfm->B, i), code)) +
+                   cs_c + rank_s_indexed(rlfm->S, rank_b_indexed(rlfm->B, i),
+                                         code)) +
                i - select_b_indexed(rlfm->B, rank_b_indexed(rlfm->B, i));
     }
 }

@@ -67,8 +67,10 @@ void free_rank_index(RankIndex *jacobson_rank);
 void free_rlfm(RLFM *rlfm);
 // pos must be in bounds
 size_t rank_s(SIndex *s, size_t pos, unsigned char code);
+size_t rank_s_indexed(SIndex *s, size_t pos, unsigned char code);
 // count must be less than total number of code
 size_t select_s(SIndex *s, size_t count, unsigned char code);
+size_t select_s_indexed(SIndex *s, size_t count, unsigned char code);
 // pos must be in bounds
 size_t rank_b(Index *b, size_t pos);
 size_t rank_b_indexed(Index *b, size_t pos);
