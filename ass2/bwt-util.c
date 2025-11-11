@@ -188,13 +188,9 @@ unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos) {
 
 void derive_rank_index(Index *index) {
     size_t n = index->len;
-    double log_n = log2(n);
     size_t subchunk_count =
         (n + RANK_SUBCHUNK_SIZE_BITS - 1) / RANK_SUBCHUNK_SIZE_BITS;
-    size_t subchunks_per_chunk = 250;
-    // ceil(log_n * log_n /
-    //      (double)RANK_SUBCHUNK_SIZE_BITS); // presume chunk size log^2(n)
-    size_t chunk_size_bits = subchunks_per_chunk * RANK_SUBCHUNK_SIZE_BITS;
+    size_t chunk_size_bits = RANK_SUBCHUNKS_PER_CHUNK * RANK_SUBCHUNK_SIZE_BITS;
     size_t chunk_count =
         (n + chunk_size_bits - 1) / chunk_size_bits; // divceil n / chunk_size
 
@@ -205,17 +201,20 @@ void derive_rank_index(Index *index) {
         calloc(subchunk_count, sizeof(rank_index->subchunk_rank));
     rank_index->chunk_count = chunk_count;
     rank_index->subchunk_count = subchunk_count;
-    rank_index->subchunks_per_chunk = subchunks_per_chunk;
+    rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
 
     uint32_t cumulative_rank = 0;
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
         rank_index->chunk_rank[chunk_index] = cumulative_rank;
 
         uint32_t relative_rank = 0;
-        for (size_t subchunk_index = 0; subchunk_index < subchunks_per_chunk;
+        for (size_t subchunk_index = 0;
+             subchunk_index < (chunk_index != chunk_count - 1
+                                   ? RANK_SUBCHUNKS_PER_CHUNK
+                                   : subchunk_count % RANK_SUBCHUNKS_PER_CHUNK);
              ++subchunk_index) {
             size_t subchunk_offset =
-                chunk_index * subchunks_per_chunk + subchunk_index;
+                chunk_index * RANK_SUBCHUNKS_PER_CHUNK + subchunk_index;
 
             rank_index->subchunk_rank[subchunk_offset] = relative_rank;
 
