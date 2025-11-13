@@ -35,6 +35,10 @@ int main(int argc, char *argv[]) {
     RLFM *rlfm = read_rlfm(input_file);
 
     FILE *output_file = fopen(argv[2], "w");
+    if (output_file == NULL) {
+        printf("could not open output file\n");
+        return 1;
+    }
     decode(rlfm, output_file);
     fclose(output_file);
 
