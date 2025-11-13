@@ -1,14 +1,27 @@
 #include "bwt-util.h"
+#include <stdio.h>
 
 void decode(RLFM *rlfm, FILE *file) {
     size_t i = rlfm->B->end;
     unsigned char c_code = 4;
     size_t cs_c = 1;
 
+    size_t buffer_size = KIBIBYTE;
+    unsigned char *buffer = calloc(buffer_size, sizeof(unsigned char));
+    size_t buffer_i = buffer_size - 1;
+    size_t bytes_left = rlfm->B->len;
+
     for (size_t file_pos = rlfm->B->len - 1;
          (file_pos >= 0 && file_pos < 0UL - 1); --file_pos) {
-        fseek(file, file_pos, SEEK_SET);
-        fputc(ENCODING[c_code], file);
+        buffer[buffer_i] = ENCODING[c_code];
+        if (buffer_i == 0) {
+            fseek(file, file_pos, SEEK_SET);
+            fwrite(buffer, sizeof(unsigned char), buffer_size, file);
+            buffer_i = buffer_size - 1;
+            bytes_left -= buffer_size;
+        } else {
+            --buffer_i;
+        }
 
         size_t b_rank = rank_b_indexed(rlfm->B, i);
         i = select_b_indexed(rlfm->Bp,
@@ -19,6 +32,10 @@ void decode(RLFM *rlfm, FILE *file) {
 
         cs_c = c_code == 0 ? 1 : rlfm->Cs[c_code - 1];
     }
+
+    fseek(file, 0, SEEK_SET);
+    fwrite(buffer + buffer_size - bytes_left, sizeof(unsigned char), bytes_left,
+           file);
 }
 
 int main(int argc, char *argv[]) {
