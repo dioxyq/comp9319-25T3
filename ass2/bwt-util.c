@@ -2,8 +2,6 @@
 #include <string.h>
 
 void free_rank_index(RankIndex *rank_index) {
-    // TODO: fix, causes segfault sometimes?
-    return;
     if (rank_index == NULL) {
         return;
     }
@@ -16,20 +14,57 @@ void free_rank_index(RankIndex *rank_index) {
     free(rank_index);
 }
 
+void free_index(Index *index) {
+    if (index == NULL) {
+        return;
+    }
+    if (index->data != NULL) {
+        free(index->data);
+    }
+    if (index->rank_index != NULL) {
+        free_rank_index(index->rank_index);
+    }
+    free(index);
+}
+
+void free_s_rank_index(SRankIndex *rank_index) {
+    if (rank_index == NULL) {
+        return;
+    }
+    if (rank_index->chunk_rank != NULL) {
+        free(rank_index->chunk_rank);
+    }
+    if (rank_index->subchunk_rank != NULL) {
+        free(rank_index->subchunk_rank);
+    }
+    free(rank_index);
+}
+
+void free_s_index(SIndex *index) {
+    if (index == NULL) {
+        return;
+    }
+    if (index->data != NULL) {
+        free(index->data);
+    }
+    if (index->rank_index != NULL) {
+        free_s_rank_index(index->rank_index);
+    }
+    free(index);
+}
+
 void free_rlfm(RLFM *rlfm) {
     if (rlfm == NULL) {
         return;
     }
     if (rlfm->S->data != NULL) {
-        free(rlfm->S->data);
+        free_s_index(rlfm->S);
     }
     if (rlfm->B->data != NULL) {
-        free(rlfm->B->data);
-        free_rank_index(rlfm->B->rank_index);
+        free_index(rlfm->B);
     }
     if (rlfm->Bp->data != NULL) {
-        free(rlfm->Bp->data);
-        free_rank_index(rlfm->Bp->rank_index);
+        free_index(rlfm->Bp);
     }
     free(rlfm);
 }
@@ -322,9 +357,12 @@ void derive_rank_index(Index *index) {
             for (int i = 0; i < RANK_SUBCHUNK_SIZE / sizeof(buffer); ++i) {
                 size_t offset =
                     subchunk_offset * RANK_SUBCHUNK_SIZE + i * sizeof(buffer);
+                if (offset >= index->size - sizeof(buffer)) {
+                    break;
+                }
 
                 memcpy(&buffer, index->data + offset, sizeof(buffer));
-                relative_rank += __builtin_popcountg(buffer);
+                relative_rank += __builtin_popcountl(buffer);
             }
         }
 
@@ -369,6 +407,9 @@ void derive_s_rank_index(SIndex *index) {
 
             for (int i = 0; i < 2 * RANK_SUBCHUNK_SIZE; ++i) {
                 size_t offset = 2 * subchunk_offset * RANK_SUBCHUNK_SIZE + i;
+                if (offset >= index->size) {
+                    break;
+                }
                 unsigned char byte = index->data[offset];
                 for (int j = 0; j < 8; j += 2) {
                     unsigned char code = (byte & (0b11 << j)) >> j;

@@ -38,5 +38,5 @@ int main(int argc, char *argv[]) {
     decode(rlfm, output_file);
     fclose(output_file);
 
-    /* free_rlfm(rlfm); */
+    free_rlfm(rlfm);
 }

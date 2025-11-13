@@ -63,7 +63,10 @@ typedef struct {
     unsigned int Cs[4];
 } RLFM;
 
-void free_rank_index(RankIndex *jacobson_rank);
+void free_rank_index(RankIndex *rank_index);
+void free_index(Index *index);
+void free_s_rank_index(SRankIndex *rank_index);
+void free_s_index(SIndex *index);
 void free_rlfm(RLFM *rlfm);
 // pos must be in bounds
 size_t rank_s(SIndex *s, size_t pos, unsigned char code);
