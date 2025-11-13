@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
     FILE *output_file = fopen(argv[2], "w");
     if (output_file == NULL) {
         printf("could not open output file\n");
+        free_rlfm(rlfm);
         return 1;
     }
     decode(rlfm, output_file);
