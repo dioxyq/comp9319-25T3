@@ -10,11 +10,10 @@ void decode(RLFM *rlfm, FILE *file) {
         fseek(file, file_pos, SEEK_SET);
         fputc(ENCODING[c_code], file);
 
+        size_t b_rank = rank_b_indexed(rlfm->B, i);
         i = select_b_indexed(rlfm->Bp,
-                             cs_c + rank_s_indexed(rlfm->S,
-                                                   rank_b_indexed(rlfm->B, i),
-                                                   c_code)) +
-            i - select_b_indexed(rlfm->B, rank_b_indexed(rlfm->B, i));
+                             cs_c + rank_s_indexed(rlfm->S, b_rank, c_code)) +
+            i - select_b_indexed(rlfm->B, b_rank);
 
         c_code = code_from_l_pos(rlfm, i);
 

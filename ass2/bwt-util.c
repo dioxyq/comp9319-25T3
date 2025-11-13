@@ -227,7 +227,7 @@ size_t select_b(Index *b, size_t count) {
 size_t select_b_indexed(Index *b, size_t count) {
     // binary search on rank index subchunks
     const double COUNT_TO_POS_HEURISTIC = 1.5;
-    const double SEARCH_WINDOW_HEURISTIC = 1;
+    const double SEARCH_WINDOW_HEURISTIC = 0.17; // 1;
 
     size_t search_window_size =
         b->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
@@ -263,14 +263,17 @@ size_t select_b_indexed(Index *b, size_t count) {
 
     size_t subchunk_count = 0;
     size_t i = pos * RANK_SUBCHUNK_SIZE_BITS / 8;
+    unsigned char byte = 0;
     for (; rank + subchunk_count < count; ++i) {
-        subchunk_count += __builtin_popcount(b->data[i]);
+        byte = b->data[i];
+        subchunk_count += __builtin_popcount(byte);
     }
     --i;
-    subchunk_count -= __builtin_popcount(b->data[i]);
+    subchunk_count -= __builtin_popcount(byte);
+
     size_t j = 0;
     for (; rank + subchunk_count < count; ++j) {
-        subchunk_count += ((b->data[i]) & (1 << j)) >> j;
+        subchunk_count += ((byte) & (1 << j)) >> j;
     }
     --j;
 
