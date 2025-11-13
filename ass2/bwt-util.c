@@ -36,6 +36,9 @@ void free_rlfm(RLFM *rlfm) {
 
 // pos must be in bounds
 size_t rank_s(SIndex *s, size_t pos, unsigned char code) {
+    if (pos >= s->len) {
+        pos = s->len - 1;
+    }
     size_t count = 0;
     for (size_t i = 0; i < pos / 4; ++i) {
         unsigned char byte = s->data[i];
@@ -53,6 +56,14 @@ size_t rank_s(SIndex *s, size_t pos, unsigned char code) {
 }
 
 size_t rank_s_indexed(SIndex *s, size_t pos, unsigned char code) {
+    if (code == 4) {
+        return 0;
+        // return pos >= s->end;
+    }
+    if (pos >= s->len) {
+        pos = s->len - 1;
+    }
+
     size_t subchunk_index = pos / RANK_SUBCHUNK_SIZE_BITS;
     size_t chunk_index = subchunk_index / s->rank_index->subchunks_per_chunk;
 
@@ -104,7 +115,7 @@ size_t select_s(SIndex *s, size_t count, unsigned char code) {
 size_t select_s_indexed(SIndex *s, size_t count, unsigned char code) {
     // binary search on rank index subchunks
     const double COUNT_TO_POS_HEURISTIC = 4;
-    const double SEARCH_WINDOW_HEURISTIC = 0.2;
+    const double SEARCH_WINDOW_HEURISTIC = 1;
 
     size_t search_window_size =
         s->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
@@ -216,7 +227,7 @@ size_t select_b(Index *b, size_t count) {
 size_t select_b_indexed(Index *b, size_t count) {
     // binary search on rank index subchunks
     const double COUNT_TO_POS_HEURISTIC = 1.5;
-    const double SEARCH_WINDOW_HEURISTIC = 0.2;
+    const double SEARCH_WINDOW_HEURISTIC = 1;
 
     size_t search_window_size =
         b->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
@@ -457,7 +468,7 @@ void read_bs(RLFM *rlfm, FILE *file, size_t file_size) {
         }
 
         bytes_to_read -= READ_BUF_SIZE;
-        size_t bytes_left = min(READ_BUF_SIZE, bytes_to_read);
+        bytes_left = min(READ_BUF_SIZE, bytes_to_read);
     }
 
     rlfm->Cs[1] += rlfm->Cs[0];
@@ -485,14 +496,11 @@ void derive_bp(RLFM *rlfm) {
     rlfm->Bp->data[0] |= 1;
 
     size_t bp_pos = 1;
-    size_t fs_pos = 1;
+    size_t fs_pos = 2;
 
     for (unsigned char code = 0; code < 4; ++code) {
         size_t curr_c_offset = fs_pos;
         for (; fs_pos <= rlfm->Cs[code]; ++fs_pos) {
-            if (fs_pos == rlfm->S->end) {
-                continue;
-            }
             size_t s_pos =
                 select_s_indexed(rlfm->S, fs_pos - curr_c_offset + 1, code);
             size_t b_pos = select_b_indexed(rlfm->B, s_pos + 1);
@@ -517,32 +525,11 @@ RLFM *read_rlfm(FILE *file) {
 
     derive_s_rank_index(rlfm->S);
 
-    // size_t pos = 100000;
-    // printf("rank_normal : %zu %zu %zu %zu\nrank_indexed: %zu %zu %zu %zu\n",
-    //        rank_s(rlfm->S, pos, 0), rank_s(rlfm->S, pos, 1),
-    //        rank_s(rlfm->S, pos, 2), rank_s(rlfm->S, pos, 3),
-    //        rank_s_indexed(rlfm->S, pos, 0), rank_s_indexed(rlfm->S, pos, 1),
-    //        rank_s_indexed(rlfm->S, pos, 2), rank_s_indexed(rlfm->S, pos, 3));
-
-    // size_t count = 5000;
-    // printf("rank_normal : %zu %zu %zu %zu\nrank_indexed: %zu %zu %zu %zu\n",
-    //        select_s(rlfm->S, count, 0), select_s(rlfm->S, count, 1),
-    //        select_s(rlfm->S, count, 2), select_s(rlfm->S, count, 3),
-    //        select_s_indexed(rlfm->S, count, 0),
-    //        select_s_indexed(rlfm->S, count, 1),
-    //        select_s_indexed(rlfm->S, count, 2),
-    //        select_s_indexed(rlfm->S, count, 3));
-
     derive_rank_index(rlfm->B);
 
     derive_bp(rlfm);
 
     derive_rank_index(rlfm->Bp);
-
-    // printf("rank: %zu, rank_indexed: %zu\n", rank_b(rlfm->B, 100000),
-    //        rank_b_indexed(rlfm->B, 100000));
-    // printf("select: %zu, select_indexed: %zu\n", select_b(rlfm->B, 100000),
-    //        select_b_indexed(rlfm->B, 100000));
 
     /* print_rlfm(rlfm); */
     /* print_rlfm_s(rlfm->S); */

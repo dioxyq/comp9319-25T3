@@ -35,11 +35,9 @@ size_t search(RLFM *rlfm, FILE *file, char *search_term, size_t len) {
         lst = lf_i(rlfm, lst, code, 1);
 
         if (lst < fst) {
-            /* printf("%c fst: %zu, lst: %zu\n", c, fst, lst); */
             return 0;
         }
     }
-    /* printf("%c fst: %zu, lst: %zu\n", c, fst, lst); */
     return lst - fst + 1;
 }
 

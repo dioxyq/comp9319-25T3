@@ -39,11 +39,5 @@ int main(int argc, char *argv[]) {
     decode(rlfm, output_file);
     fclose(output_file);
 
-    /* print_rlfm(rlfm); */
-    /* print_rlfm_s(&rlfm->S); */
-    /* print_rlfm_b(&rlfm->B); */
-    /* print_rlfm_b(&rlfm->Bp); */
-    /* print_rank_index(rlfm->B.rank_index); */
-
-    free_rlfm(rlfm);
+    /* free_rlfm(rlfm); */
 }
