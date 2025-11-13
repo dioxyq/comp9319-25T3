@@ -36,6 +36,7 @@ void decode(RLFM *rlfm, FILE *file) {
     fseek(file, 0, SEEK_SET);
     fwrite(buffer + buffer_size - bytes_left, sizeof(unsigned char), bytes_left,
            file);
+    free(buffer);
 }
 
 int main(int argc, char *argv[]) {

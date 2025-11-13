@@ -78,6 +78,7 @@ size_t select_s_indexed(SIndex *s, size_t count, unsigned char code);
 size_t rank_b(Index *b, size_t pos);
 size_t rank_b_indexed(Index *b, size_t pos);
 // count must be less than total number of 1s
+size_t select_b_from_i(Index *b, size_t count, size_t start);
 size_t select_b(Index *b, size_t count);
 size_t select_b_indexed(Index *b, size_t count);
 unsigned char code_from_l_pos(RLFM *rlfm, size_t l_pos);

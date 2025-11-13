@@ -237,6 +237,40 @@ size_t rank_b_indexed(Index *b, size_t pos) {
     return cumulative_rank + relative_rank + count;
 }
 
+size_t select_b_from_i(Index *b, size_t count, size_t start) {
+    size_t sum = 0;
+
+    unsigned char byte = b->data[start / 8];
+    int j = start % 8;
+    for (; sum < count && j < 8; ++j) {
+        sum += ((1 << j) & byte) >> j;
+    }
+    --j;
+
+    if (sum == count) {
+        return (start / 8) * 8 + j;
+    }
+
+    size_t i = start / 8 + 1;
+    for (; sum < count && i <= b->len / 8; i++) {
+        sum += __builtin_popcount(b->data[i]);
+    }
+
+    --i;
+    size_t pos = i * 8;
+    //  correctly count overshoot byte
+    if (sum >= count) {
+        unsigned char byte = b->data[i];
+        sum -= __builtin_popcount(byte);
+        int j = 0;
+        for (; sum < count; j++) {
+            sum += ((1 << j) & byte) >> j;
+        }
+        pos += j - 1;
+    }
+    return pos;
+}
+
 // count must be less than s->len
 size_t select_b(Index *b, size_t count) {
     size_t sum = 0;
@@ -551,7 +585,7 @@ void derive_bp(RLFM *rlfm) {
             rlfm->Bp->data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
             size_t b_end = s_pos + 1 < rlfm->S->len
-                               ? select_b_indexed(rlfm->B, s_pos + 2)
+                               ? select_b_from_i(rlfm->B, 1, b_pos + 1)
                                : rlfm->B->len;
             bp_pos += b_end - b_pos;
         }
