@@ -373,14 +373,14 @@ void derive_rank_index(Index *index) {
     rank_index->subchunks_per_chunk = RANK_SUBCHUNKS_PER_CHUNK;
 
     uint32_t cumulative_rank = 0;
+    size_t remaining_subchunks = subchunk_count;
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
         rank_index->chunk_rank[chunk_index] = cumulative_rank;
 
         uint32_t relative_rank = 0;
         for (size_t subchunk_index = 0;
-             subchunk_index < (chunk_index != chunk_count - 1
-                                   ? RANK_SUBCHUNKS_PER_CHUNK
-                                   : subchunk_count % RANK_SUBCHUNKS_PER_CHUNK);
+             subchunk_index <
+             min(remaining_subchunks, RANK_SUBCHUNKS_PER_CHUNK);
              ++subchunk_index) {
             size_t subchunk_offset =
                 chunk_index * RANK_SUBCHUNKS_PER_CHUNK + subchunk_index;
@@ -401,6 +401,7 @@ void derive_rank_index(Index *index) {
         }
 
         cumulative_rank += relative_rank;
+        remaining_subchunks -= RANK_SUBCHUNKS_PER_CHUNK;
     }
 
     index->rank_index = rank_index;
@@ -581,6 +582,7 @@ void derive_bp(RLFM *rlfm) {
         for (; fs_pos <= rlfm->Cs[code]; ++fs_pos) {
             size_t s_pos =
                 select_s_indexed(rlfm->S, fs_pos - curr_c_offset + 1, code);
+            /* printf("%zu\n", s_pos); */
             size_t b_pos = select_b_indexed(rlfm->B, s_pos + 1);
             rlfm->Bp->data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
