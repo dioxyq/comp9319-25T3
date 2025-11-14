@@ -11,11 +11,10 @@ void decode(RLFM *rlfm, FILE *file) {
     size_t buffer_i = buffer_size - 1;
     size_t bytes_left = rlfm->B->len;
 
-    for (size_t file_pos = rlfm->B->len - 1;
-         (file_pos >= 0 && file_pos < 0UL - 1); --file_pos) {
+    for (size_t file_pos = rlfm->B->len; file_pos > 0; --file_pos) {
         buffer[buffer_i] = ENCODING[c_code];
         if (buffer_i == 0) {
-            fseek(file, file_pos, SEEK_SET);
+            fseek(file, file_pos - 1, SEEK_SET);
             fwrite(buffer, sizeof(unsigned char), buffer_size, file);
             buffer_i = buffer_size - 1;
             bytes_left -= buffer_size;

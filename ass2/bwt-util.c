@@ -467,7 +467,6 @@ void derive_s_rank_index(SIndex *index) {
 RLFM *init_rlfm(size_t file_size) {
     size_t s_size = max(MIN_ALLOC, file_size * ST_RATIO_HEURISTIC);
     size_t b_size = max(MIN_ALLOC, file_size * BT_RATIO_HEURISTIC);
-    size_t bp_size = b_size;
 
     RLFM *rlfm = malloc(sizeof(RLFM));
 
@@ -514,8 +513,8 @@ void read_bs(RLFM *rlfm, FILE *file, size_t file_size) {
         char last_code = -1;
         // set B and S from file data
         for (size_t i = 0; i < bytes_left; ++i) {
-            char code = (buf[i] & 0b11100000) >> 5;
-            char run_length = (buf[i] & 0b11111) + 1;
+            unsigned char code = (buf[i] & 0b11100000) >> 5;
+            unsigned char run_length = (buf[i] & 0b11111) + 1;
 
             if (code != last_code) {
                 last_code = code;
@@ -642,10 +641,10 @@ void print_rank_index(RankIndex *rank_index) {
 
 void print_rlfm_s(SIndex *s) {
     for (size_t i = 0; i < (s->len + 3) / 4; ++i) {
-        char byte = s->data[i];
+        unsigned char byte = s->data[i];
         char buf[5] = {'\0'};
         for (int j = 0; j < min(4, s->len - i * 4); ++j) {
-            char code = (byte & (0b11 << (2 * j))) >> (2 * j);
+            unsigned char code = (byte & (0b11 << (2 * j))) >> (2 * j);
             if (i * 4 + j == s->end) {
                 code = 4;
             }
@@ -658,7 +657,7 @@ void print_rlfm_s(SIndex *s) {
 
 void print_rlfm_b(Index *b) {
     for (size_t i = 0; i < (b->len + 7) / 8; ++i) {
-        char byte = b->data[i];
+        unsigned char byte = b->data[i];
         for (int j = 0; j < min(8, b->len - i * 8); ++j) {
             char bit = (byte & (1 << j)) >> j;
             printf("%d", bit);
