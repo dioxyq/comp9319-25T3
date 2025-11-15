@@ -149,18 +149,8 @@ size_t select_s(SIndex *s, size_t count, unsigned char code) {
 
 size_t select_s_indexed(SIndex *s, size_t count, unsigned char code) {
     // binary search on rank index subchunks
-    const double COUNT_TO_POS_HEURISTIC = 4;
-    const double SEARCH_WINDOW_HEURISTIC = 1;
-
-    size_t search_window_size =
-        s->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
-    size_t start_index =
-        count * COUNT_TO_POS_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
-    size_t low = search_window_size > start_index
-                     ? 0
-                     : start_index - search_window_size / 2;
-    size_t high = min(s->rank_index->subchunk_count - 1,
-                      start_index + search_window_size / 2);
+    size_t low = 0;
+    size_t high = s->rank_index->subchunk_count - 1;
     size_t pos = low;
     size_t rank =
         s->rank_index->subchunk_rank[low][code] +
@@ -295,18 +285,8 @@ size_t select_b(Index *b, size_t count) {
 
 size_t select_b_indexed(Index *b, size_t count) {
     // binary search on rank index subchunks
-    const double COUNT_TO_POS_HEURISTIC = 1.5;
-    const double SEARCH_WINDOW_HEURISTIC = 1;
-
-    size_t search_window_size =
-        b->len * SEARCH_WINDOW_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
-    size_t start_index =
-        count * COUNT_TO_POS_HEURISTIC / RANK_SUBCHUNK_SIZE_BITS;
-    size_t low = search_window_size > start_index
-                     ? 0
-                     : start_index - search_window_size / 2;
-    size_t high = min(b->rank_index->subchunk_count - 1,
-                      start_index + search_window_size / 2);
+    size_t low = 0;
+    size_t high = b->rank_index->subchunk_count - 1;
     size_t pos = low;
     size_t rank =
         b->rank_index->subchunk_rank[low] +
