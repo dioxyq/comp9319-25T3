@@ -1,4 +1,5 @@
 #include "bwt-util.h"
+#include <stdio.h>
 #include <string.h>
 
 static const size_t GAP_SIZE = 128;
@@ -6,7 +7,8 @@ static const double OCC_SIZE_RATIO_HEURISTIC = 1.8;
 
 typedef struct {
     unsigned int occ[3];
-    unsigned int offset;
+    unsigned int offset : 27;
+    unsigned int rl_offset : 5;
 } Occ;
 
 typedef struct {
@@ -21,7 +23,7 @@ void print_fm(FM *fm) {
     printf("gap_size: %zu, len: %zu, ", fm->gap_size, fm->len);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", fm->C[0], fm->C[1], fm->C[2],
            fm->C[3]);
-    for (size_t i = 0; i < fm->len; ++i) {
+    for (size_t i = 0; i < fm->len / fm->gap_size + 1; ++i) {
         Occ occ = fm->Occ[i];
         printf("A: %d, C: %d, G: %d, T: %zu, offset: %d\n", occ.occ[0],
                occ.occ[1], occ.occ[2],
@@ -90,7 +92,11 @@ FM *read_fm(FILE *file) {
                 if (code < 3) {
                     ++prev_occ.occ[code];
                 }
-                fm->Occ[occ_offset] = prev_occ;
+                size_t occ_index = occ_offset % fm->gap_size;
+                if (!occ_offset) {
+                    prev_occ.rl_offset = j - occ_offset;
+                    fm->Occ[occ_index] = prev_occ;
+                }
             }
 
             ++prev_occ.offset;
@@ -114,16 +120,53 @@ FM *read_fm(FILE *file) {
     return fm;
 }
 
-size_t get_occ(FM *fm, FILE *file, size_t i, unsigned char code) {
-    Occ occ = fm->Occ[i];
-    if (code < 3) {
-        return occ.occ[code];
+size_t read_occ_gap(FM *fm, FILE *file, size_t pos, unsigned char code) {
+    struct stat stat_buf;
+    fstat(fileno(file), &stat_buf);
+    size_t file_size = stat_buf.st_size;
+
+    size_t occ_index = pos / fm->gap_size;
+    Occ occ = fm->Occ[occ_index];
+
+    size_t occ_offset = occ_index * fm->gap_size;
+    size_t chars_to_read = min(pos - occ_offset, file_size - occ.offset) + 1;
+
+    size_t c_count = (code < 3)
+                         ? occ.occ[code]
+                         : occ_offset + (occ_offset < fm->end) -
+                               (size_t)(occ.occ[0] + occ.occ[1] + occ.occ[2]);
+
+    char *buf = malloc(chars_to_read);
+    fseek(file, occ.offset, SEEK_SET);
+    fread(buf, chars_to_read, 1, file);
+
+    ++occ_offset;
+
+    for (size_t i = 0; i < chars_to_read && occ_offset <= pos; ++i) {
+        unsigned char code_i = (buf[i] & 0b11100000) >> 5;
+        unsigned char run_length = (buf[i] & 0b11111) + 1;
+
+        if (i == 0) {
+            run_length -= occ.rl_offset + 1;
+        }
+
+        if (code_i == code) {
+            if (occ_offset + run_length > pos) {
+                c_count += pos - occ_offset + 1;
+                break;
+            }
+            c_count += run_length;
+        }
+        occ_offset += run_length;
     }
-    return i + (i < fm->end) - (size_t)(occ.occ[0] + occ.occ[1] + occ.occ[2]);
+
+    free(buf);
+
+    return c_count;
 }
 
 size_t lf_i(FM *fm, FILE *file, size_t i, unsigned char code) {
-    return fm->C[code] + get_occ(fm, file, i, code);
+    return fm->C[code] + read_occ_gap(fm, file, i, code);
 }
 
 size_t search(FM *fm, FILE *file, char *search_term, size_t len) {
@@ -161,7 +204,18 @@ int main(int argc, char *argv[]) {
     }
 
     FM *fm = read_fm(file);
+
     /* print_fm(fm); */
+
+    // printf("i A C G T\n");
+    // for (int i = 0; i < 40; ++i) {
+    //     printf("%d ", i);
+    //     for (unsigned char code = 0; code < 4; ++code) {
+    //         size_t count = read_occ_gap(fm, file, i, code);
+    //         printf("%zu ", count);
+    //     }
+    //     printf("\n");
+    // }
 
     // min 1 char, max 100 chars (from spec)
     char *line = NULL;
