@@ -25,11 +25,11 @@ void print_fm(FM *fm) {
            fm->C[3]);
     for (size_t i = 0; i < fm->len / fm->gap_size + 1; ++i) {
         Occ occ = fm->Occ[i];
-        printf("A: %d, C: %d, G: %d, T: %zu, offset: %d\n", occ.occ[0],
-               occ.occ[1], occ.occ[2],
-               i + (i < fm->end) -
+        printf("A: %d, C: %d, G: %d, T: %zu, offset: %d, rl_offset: %d\n",
+               occ.occ[0], occ.occ[1], occ.occ[2],
+               i * fm->gap_size + (i * fm->gap_size < fm->end) -
                    (size_t)(occ.occ[0] + occ.occ[1] + occ.occ[2]),
-               occ.offset);
+               occ.offset, occ.rl_offset);
     }
 }
 
@@ -92,9 +92,9 @@ FM *read_fm(FILE *file) {
                 if (code < 3) {
                     ++prev_occ.occ[code];
                 }
-                size_t occ_index = occ_offset % fm->gap_size;
-                if (!occ_offset) {
-                    prev_occ.rl_offset = j - occ_offset;
+                if (occ_offset % fm->gap_size == 0) {
+                    size_t occ_index = occ_offset / fm->gap_size;
+                    prev_occ.rl_offset = occ_offset - j;
                     fm->Occ[occ_index] = prev_occ;
                 }
             }
