@@ -11,9 +11,9 @@ static const char ENCODING[5] = {'A', 'C', 'G', 'T', '\n'};
 static const size_t KIBIBYTE = 1024;
 static const size_t MEBIBYTE = 1024 * 1024;
 static const size_t MIN_ALLOC = KIBIBYTE;
+static const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 static const size_t GAP_SIZE = 128;
 static const double OCC_SIZE_RATIO_HEURISTIC = 1.8;
-static const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 
 typedef struct {
     unsigned int occ[3];
@@ -33,7 +33,7 @@ void print_fm(FM *fm) {
     printf("gap_size: %zu, len: %zu, ", fm->gap_size, fm->len);
     printf("C: [A: %d, C: %d, G: %d, T: %d]\n", fm->C[0], fm->C[1], fm->C[2],
            fm->C[3]);
-    for (size_t i = 0; i < fm->len / fm->gap_size + 1; ++i) {
+    for (size_t i = 0; i < (fm->len + fm->gap_size - 1) / fm->gap_size; ++i) {
         Occ occ = fm->Occ[i];
         printf("A: %d, C: %d, G: %d, T: %zu, offset: %d, rl_offset: %d\n",
                occ.occ[0], occ.occ[1], occ.occ[2],
@@ -193,6 +193,7 @@ size_t search(FM *fm, FILE *file, char *search_term, size_t len) {
         c = search_term[i];
         code = (c == ENCODING[1]) + 2 * (c == ENCODING[2]) +
                3 * (c == ENCODING[3]);
+
         fst = lf_i(fm, file, fst - 1, code);
         lst = lf_i(fm, file, lst, code) - 1;
 
@@ -220,7 +221,7 @@ int main(int argc, char *argv[]) {
     /* print_fm(fm); */
 
     // printf("i A C G T\n");
-    // for (int i = 0; i < 40; ++i) {
+    // for (int i = 0; i < 247910; ++i) {
     //     printf("%d ", i);
     //     for (unsigned char code = 0; code < 4; ++code) {
     //         size_t count = read_occ_gap(fm, file, i, code);
