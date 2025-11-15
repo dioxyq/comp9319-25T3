@@ -1,9 +1,19 @@
-#include "bwt-util.h"
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+static const char ENCODING[5] = {'A', 'C', 'G', 'T', '\n'};
+static const size_t KIBIBYTE = 1024;
+static const size_t MEBIBYTE = 1024 * 1024;
+static const size_t MIN_ALLOC = KIBIBYTE;
 static const size_t GAP_SIZE = 128;
 static const double OCC_SIZE_RATIO_HEURISTIC = 1.8;
+static const size_t READ_BUF_SIZE = 64 * KIBIBYTE;
 
 typedef struct {
     unsigned int occ[3];
@@ -44,7 +54,8 @@ void free_fm(FM *fm) {
 }
 
 FM *init_fm(size_t file_size) {
-    size_t occ_size = max(MIN_ALLOC, file_size * OCC_SIZE_RATIO_HEURISTIC);
+    size_t occ_size =
+        max(MIN_ALLOC, file_size * OCC_SIZE_RATIO_HEURISTIC / GAP_SIZE);
 
     FM *fm = malloc(sizeof(FM));
 
@@ -115,7 +126,8 @@ FM *read_fm(FILE *file) {
 
     fm->len = occ_offset;
 
-    fm->Occ = realloc(fm->Occ, fm->len * sizeof(Occ));
+    fm->Occ = realloc(fm->Occ, ((fm->len + fm->gap_size - 1) / fm->gap_size) *
+                                   sizeof(Occ));
 
     return fm;
 }

@@ -1,6 +1,6 @@
 all:
-	gcc -static bwtdecode.c bwt-util.c -o bwtdecode -pg -O2
-	gcc -static bwtsearch.c bwt-util.c -o bwtsearch -pg -O2
+	musl-gcc -static bwtdecode.c bwt-util.c -o bwtdecode -O3
+	musl-gcc -static bwtsearch.c -o bwtsearch -O3
 
 clean:
 	rm -f bwtdecode
