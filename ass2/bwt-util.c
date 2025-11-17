@@ -1,5 +1,4 @@
 #include "bwt-util.h"
-#include <string.h>
 
 void free_rank_index(RankIndex *rank_index) {
     if (rank_index == NULL) {
@@ -83,7 +82,7 @@ size_t rank_s(SIndex *s, size_t pos, unsigned char code) {
     }
     // count remaining codes from pos - 3 to pos
     unsigned char byte = s->data[pos / 4];
-    for (int i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
+    for (size_t i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
         count += code == ((byte & (0b11 << i)) >> i);
     };
     count -= (!code) * (pos >= s->end);
@@ -95,6 +94,7 @@ size_t rank_s_indexed(SIndex *s, size_t pos, unsigned char code) {
         return 0;
         // return pos >= s->end;
     }
+
     if (pos >= s->len) {
         pos = s->len - 1;
     }
@@ -112,7 +112,7 @@ size_t rank_s_indexed(SIndex *s, size_t pos, unsigned char code) {
     }
     // count remaining codes from pos - 3 to pos
     unsigned char byte = s->data[pos / 4];
-    for (int i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
+    for (size_t i = 0; i < 2 * ((pos % 4) + 1); i += 2) {
         count += code == ((byte & (0b11 << i)) >> i);
     };
     count -= (!code) * (pos >= s->end);
@@ -357,7 +357,7 @@ void derive_rank_index(Index *index) {
     for (size_t chunk_index = 0; chunk_index < chunk_count; ++chunk_index) {
         rank_index->chunk_rank[chunk_index] = cumulative_rank;
 
-        uint32_t relative_rank = 0;
+        uint16_t relative_rank = 0;
         for (size_t subchunk_index = 0;
              subchunk_index <
              min(remaining_subchunks, RANK_SUBCHUNKS_PER_CHUNK);
@@ -368,7 +368,7 @@ void derive_rank_index(Index *index) {
             rank_index->subchunk_rank[subchunk_offset] = relative_rank;
 
             uint64_t buffer = 0;
-            for (int i = 0; i < RANK_SUBCHUNK_SIZE / sizeof(buffer); ++i) {
+            for (size_t i = 0; i < RANK_SUBCHUNK_SIZE / sizeof(buffer); ++i) {
                 size_t offset =
                     subchunk_offset * RANK_SUBCHUNK_SIZE + i * sizeof(buffer);
                 if (offset + sizeof(buffer) >= index->size) {
@@ -420,7 +420,7 @@ void derive_s_rank_index(SIndex *index) {
             memcpy(rank_index->subchunk_rank[subchunk_offset], relative_rank,
                    sizeof(uint16_t[4]));
 
-            for (int i = 0; i < 2 * RANK_SUBCHUNK_SIZE; ++i) {
+            for (size_t i = 0; i < 2 * RANK_SUBCHUNK_SIZE; ++i) {
                 size_t offset = 2 * subchunk_offset * RANK_SUBCHUNK_SIZE + i;
                 if (offset >= index->size) {
                     break;
@@ -489,8 +489,9 @@ void read_bs(RLFM *rlfm, FILE *file, size_t file_size) {
     size_t b_offset = 0;
     char b_bit_offset = 0;
 
+    unsigned char last_code = -1;
+
     while (fread(buf, bytes_left, 1, file)) {
-        char last_code = -1;
         // set B and S from file data
         for (size_t i = 0; i < bytes_left; ++i) {
             unsigned char code = (buf[i] & 0b11100000) >> 5;
@@ -561,7 +562,6 @@ void derive_bp(RLFM *rlfm) {
         for (; fs_pos <= rlfm->Cs[code]; ++fs_pos) {
             size_t s_pos =
                 select_s_indexed(rlfm->S, fs_pos - curr_c_offset + 1, code);
-            /* printf("%zu\n", s_pos); */
             size_t b_pos = select_b_indexed(rlfm->B, s_pos + 1);
             rlfm->Bp->data[bp_pos / 8] |= 1 << (bp_pos % 8);
 
@@ -623,7 +623,7 @@ void print_rlfm_s(SIndex *s) {
     for (size_t i = 0; i < (s->len + 3) / 4; ++i) {
         unsigned char byte = s->data[i];
         char buf[5] = {'\0'};
-        for (int j = 0; j < min(4, s->len - i * 4); ++j) {
+        for (size_t j = 0; j < min(4, s->len - i * 4); ++j) {
             unsigned char code = (byte & (0b11 << (2 * j))) >> (2 * j);
             if (i * 4 + j == s->end) {
                 code = 4;
@@ -638,7 +638,7 @@ void print_rlfm_s(SIndex *s) {
 void print_rlfm_b(Index *b) {
     for (size_t i = 0; i < (b->len + 7) / 8; ++i) {
         unsigned char byte = b->data[i];
-        for (int j = 0; j < min(8, b->len - i * 8); ++j) {
+        for (size_t j = 0; j < min(8, b->len - i * 8); ++j) {
             char bit = (byte & (1 << j)) >> j;
             printf("%d", bit);
         }
