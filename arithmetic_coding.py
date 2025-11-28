@@ -65,5 +65,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # ae = ArithmeticEncoding(0.91805, 8, [('a', 0.125), ('f', 0.625), ('i', 0.75), ('r', 1)])
-    # print(ae.decode())
