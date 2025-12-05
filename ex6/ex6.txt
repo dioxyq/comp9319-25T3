@@ -1,0 +1,44 @@
+1.
+<c @b="1">
+  <d>Text3</d>
+</c>
+
+2.
+<c>
+  <d>Text1</d> 
+</c>
+<c @b="1">
+  <d>Text3</d>
+</c>
+<c>
+  <d>Text5</d>
+</c>
+
+3.
+<c>
+  <d>Text1</d> 
+</c>
+<c @b="1">
+  <d>Text3</d>
+</c>
+
+4.
+<c>
+  <d>Text1</d> 
+</c>
+<c @b="1">
+  <d>Text3</d>
+</c>
+
+5.
+<c>
+  <d>Text5</d>
+</c>
+
+6.
+maintain querying by keeping structure and compressing data in place
+compress by mapping tags to shorter labels and compressing data with static huffman
+
+7. ((()((())
+min: 0, max: 5
+
