@@ -45,6 +45,20 @@ class ArithmeticEncoding:
 
         return ae
 
+    @classmethod
+    def encode_ascii(cls, s: str):
+        lower = 0
+        table = [(chr(i), i / 127) for i in range(0, 127)]
+        ae = ArithmeticEncoding(0, len(s), table)
+
+        mul = 1
+        for c in s:
+            lower, upper = ae.get_bounds(c)
+            ae.value += lower * mul 
+            mul *= upper - lower
+
+        return ae
+
     def decode(self) -> str:
         res = ''
         i = self.value
@@ -59,6 +73,8 @@ class ArithmeticEncoding:
 def main():
     if sys.argv[1] == '--decode':
         print(ArithmeticEncoding(float(sys.argv[2]), int(sys.argv[3]), ast.literal_eval(sys.argv[4])).decode())
+    elif sys.argv[1] == '--ascii':
+        print(ArithmeticEncoding.encode_ascii(sys.argv[2]))
     else:
         print(ArithmeticEncoding.encode(sys.argv[1]))
 
