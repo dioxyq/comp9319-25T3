@@ -1,29 +1,39 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
+
+using namespace std;
 
 int main(int argc, char **argv) {
-    std::cout << std::setprecision(10);
-    const double RANGE_SIZE = 1.0 / 127.0;
+    cout << setprecision(10);
 
     auto filename = argv[1];
-    std::ifstream file(filename);
-    std::string s;
-    std::getline(file, s);
-    std::sort(s.begin(), s.end());
+    ifstream file(filename);
+    string s;
+    getline(file, s);
+    cout << s << endl;
 
-    std::cout << s << std::endl;
+    string s2 = s;
+    sort(s2.begin(), s2.end());
+    map<char, pair<double, double>> ranges{};
+    double prob = 1.0 / s2.length();
+    for (int i = 0; i < s2.length(); ++i) {
+        if (ranges.contains(s2[i])) {
+            ranges[s2[i]].second += prob;
+        } else {
+            ranges[s2[i]] = pair(prob * i, prob * (i + 1));
+        }
+    }
 
     double low = 0.0;
     double high = 1.0;
     for (const auto c : s) {
         double code_range = high - low;
         const double idx = c;
-        high = low + code_range * RANGE_SIZE * (c + 1);
-        low = low + code_range * RANGE_SIZE * c;
-        std::cout << c << ' ' << low << ' ' << high << std::endl;
+        high = low + code_range * ranges[c].second;
+        low = low + code_range * ranges[c].first;
+        cout << c << ' ' << low << ' ' << high << endl;
     }
-
-    std::cout << low << ' ' << high << std::endl;
-    return 0;
+    cout << low << ' ' << high << endl;
 }
